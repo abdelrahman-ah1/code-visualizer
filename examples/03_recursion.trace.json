@@ -2,7 +2,7 @@
   "schema_version": "codeviz.trace/1.0",
   "runtime": {
     "implementation": "cpython",
-    "version": "3.12.16"
+    "version": "3.11.9"
   },
   "source": "def factorial(n):\n    if n <= 1:\n        return 1\n    partial = factorial(n - 1)\n    return n * partial\nanswer = factorial(3)\n",
   "limits": {
@@ -771,5 +771,5 @@
   "complete": true,
   "stdout": "",
   "stderr": "",
-  "resource_limits_applied": true
+  "resource_limits_applied": false
 }

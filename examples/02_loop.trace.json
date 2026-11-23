@@ -2,7 +2,7 @@
   "schema_version": "codeviz.trace/1.0",
   "runtime": {
     "implementation": "cpython",
-    "version": "3.12.16"
+    "version": "3.11.9"
   },
   "source": "total = 0\nfor i in range(3):\n    total += i\n",
   "limits": {
@@ -274,5 +274,5 @@
   "complete": true,
   "stdout": "",
   "stderr": "",
-  "resource_limits_applied": true
+  "resource_limits_applied": false
 }

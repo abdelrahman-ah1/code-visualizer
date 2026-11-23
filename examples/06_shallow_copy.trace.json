@@ -2,7 +2,7 @@
   "schema_version": "codeviz.trace/1.0",
   "runtime": {
     "implementation": "cpython",
-    "version": "3.12.16"
+    "version": "3.11.9"
   },
   "source": "inner = [1]\na = [inner]\nb = a[:]\nb[0].append(2)\nb.append([9])\n",
   "limits": {
@@ -348,5 +348,5 @@
   "complete": true,
   "stdout": "",
   "stderr": "",
-  "resource_limits_applied": true
+  "resource_limits_applied": false
 }

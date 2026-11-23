@@ -2,7 +2,7 @@
   "schema_version": "codeviz.trace/1.0",
   "runtime": {
     "implementation": "cpython",
-    "version": "3.12.16"
+    "version": "3.11.9"
   },
   "source": "name = input()\nprint('Hello', name)\n",
   "limits": {
@@ -103,5 +103,5 @@
   "complete": true,
   "stdout": "Hello Ada\n",
   "stderr": "",
-  "resource_limits_applied": true
+  "resource_limits_applied": false
 }
