@@ -1,0 +1,16 @@
+{
+  "status": "ok",
+  "final": {
+    "total": 3,
+    "i": 2
+  },
+  "line_series": {
+    "line": 3,
+    "name": "total",
+    "values": [
+      0,
+      0,
+      1
+    ]
+  }
+}

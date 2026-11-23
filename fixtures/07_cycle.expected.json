@@ -1,0 +1,8 @@
+{
+  "status": "ok",
+  "self_cycle": {
+    "name": "node",
+    "field": "next",
+    "value": 7
+  }
+}

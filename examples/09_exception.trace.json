@@ -1,0 +1,170 @@
+{
+  "schema_version": "codeviz.trace/1.0",
+  "runtime": {
+    "implementation": "cpython",
+    "version": "3.12.16"
+  },
+  "source": "x = 5\ny = 0\nanswer = x / y\n",
+  "limits": {
+    "wall_seconds": 2.0,
+    "events": 500,
+    "output_chars": 8192
+  },
+  "events": [
+    {
+      "step": 0,
+      "event": "call",
+      "line": 0,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 0,
+          "locals": {}
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 1,
+      "event": "line",
+      "line": 1,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 1,
+          "locals": {}
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 2,
+      "event": "line",
+      "line": 2,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 2,
+          "locals": {
+            "x": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 5
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 3,
+      "event": "line",
+      "line": 3,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 3,
+          "locals": {
+            "x": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 5
+            },
+            "y": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 0
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 4,
+      "event": "exception",
+      "line": 3,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 3,
+          "locals": {
+            "x": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 5
+            },
+            "y": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 0
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": [],
+      "exception_type": "ZeroDivisionError"
+    },
+    {
+      "step": 5,
+      "event": "return",
+      "line": 3,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 3,
+          "locals": {
+            "x": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 5
+            },
+            "y": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 0
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": [],
+      "return_value": {
+        "kind": "scalar",
+        "type": "NoneType",
+        "value": null
+      }
+    }
+  ],
+  "status": "error",
+  "complete": true,
+  "stdout": "",
+  "stderr": "",
+  "resource_limits_applied": true,
+  "error": {
+    "type": "ZeroDivisionError"
+  }
+}

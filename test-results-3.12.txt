@@ -1,0 +1,18 @@
+test_caught_exception_is_not_run_failure (test_trace.EdgeCases.test_caught_exception_is_not_run_failure) ... ok
+test_deleted_binding (test_trace.EdgeCases.test_deleted_binding) ... ok
+test_dict_and_returned_object (test_trace.EdgeCases.test_dict_and_returned_object) ... ok
+test_event_budget (test_trace.EdgeCases.test_event_budget) ... ok
+test_generator_rejected (test_trace.EdgeCases.test_generator_rejected) ... ok
+test_no_custom_repr (test_trace.EdgeCases.test_no_custom_repr) ... ok
+test_object_budget (test_trace.EdgeCases.test_object_budget) ... ok
+test_output_budget (test_trace.EdgeCases.test_output_budget) ... ok
+test_snapshot_truncation (test_trace.EdgeCases.test_snapshot_truncation) ... ok
+test_snapshots_are_immutable (test_trace.EdgeCases.test_snapshots_are_immutable) ... ok
+test_stderr_and_eof (test_trace.EdgeCases.test_stderr_and_eof) ... ok
+test_syntax_error (test_trace.EdgeCases.test_syntax_error) ... ok
+test_ten_programs (test_trace.Fixtures.test_ten_programs) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 1.908s
+
+OK

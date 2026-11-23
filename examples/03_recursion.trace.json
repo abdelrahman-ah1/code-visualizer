@@ -1,0 +1,775 @@
+{
+  "schema_version": "codeviz.trace/1.0",
+  "runtime": {
+    "implementation": "cpython",
+    "version": "3.12.16"
+  },
+  "source": "def factorial(n):\n    if n <= 1:\n        return 1\n    partial = factorial(n - 1)\n    return n * partial\nanswer = factorial(3)\n",
+  "limits": {
+    "wall_seconds": 2.0,
+    "events": 500,
+    "output_chars": 8192
+  },
+  "events": [
+    {
+      "step": 0,
+      "event": "call",
+      "line": 0,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 0,
+          "locals": {}
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 1,
+      "event": "line",
+      "line": 1,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 1,
+          "locals": {}
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 2,
+      "event": "line",
+      "line": 6,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 6,
+          "locals": {
+            "factorial": {
+              "kind": "opaque",
+              "type": "function"
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 3,
+      "event": "call",
+      "line": 1,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 6,
+          "locals": {
+            "factorial": {
+              "kind": "opaque",
+              "type": "function"
+            }
+          }
+        },
+        {
+          "depth": 1,
+          "function": "factorial",
+          "line": 1,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 3
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 4,
+      "event": "line",
+      "line": 2,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 6,
+          "locals": {
+            "factorial": {
+              "kind": "opaque",
+              "type": "function"
+            }
+          }
+        },
+        {
+          "depth": 1,
+          "function": "factorial",
+          "line": 2,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 3
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 5,
+      "event": "line",
+      "line": 4,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 6,
+          "locals": {
+            "factorial": {
+              "kind": "opaque",
+              "type": "function"
+            }
+          }
+        },
+        {
+          "depth": 1,
+          "function": "factorial",
+          "line": 4,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 3
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 6,
+      "event": "call",
+      "line": 1,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 6,
+          "locals": {
+            "factorial": {
+              "kind": "opaque",
+              "type": "function"
+            }
+          }
+        },
+        {
+          "depth": 1,
+          "function": "factorial",
+          "line": 4,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 3
+            }
+          }
+        },
+        {
+          "depth": 2,
+          "function": "factorial",
+          "line": 1,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 2
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 7,
+      "event": "line",
+      "line": 2,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 6,
+          "locals": {
+            "factorial": {
+              "kind": "opaque",
+              "type": "function"
+            }
+          }
+        },
+        {
+          "depth": 1,
+          "function": "factorial",
+          "line": 4,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 3
+            }
+          }
+        },
+        {
+          "depth": 2,
+          "function": "factorial",
+          "line": 2,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 2
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 8,
+      "event": "line",
+      "line": 4,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 6,
+          "locals": {
+            "factorial": {
+              "kind": "opaque",
+              "type": "function"
+            }
+          }
+        },
+        {
+          "depth": 1,
+          "function": "factorial",
+          "line": 4,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 3
+            }
+          }
+        },
+        {
+          "depth": 2,
+          "function": "factorial",
+          "line": 4,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 2
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 9,
+      "event": "call",
+      "line": 1,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 6,
+          "locals": {
+            "factorial": {
+              "kind": "opaque",
+              "type": "function"
+            }
+          }
+        },
+        {
+          "depth": 1,
+          "function": "factorial",
+          "line": 4,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 3
+            }
+          }
+        },
+        {
+          "depth": 2,
+          "function": "factorial",
+          "line": 4,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 2
+            }
+          }
+        },
+        {
+          "depth": 3,
+          "function": "factorial",
+          "line": 1,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 1
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 10,
+      "event": "line",
+      "line": 2,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 6,
+          "locals": {
+            "factorial": {
+              "kind": "opaque",
+              "type": "function"
+            }
+          }
+        },
+        {
+          "depth": 1,
+          "function": "factorial",
+          "line": 4,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 3
+            }
+          }
+        },
+        {
+          "depth": 2,
+          "function": "factorial",
+          "line": 4,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 2
+            }
+          }
+        },
+        {
+          "depth": 3,
+          "function": "factorial",
+          "line": 2,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 1
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 11,
+      "event": "line",
+      "line": 3,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 6,
+          "locals": {
+            "factorial": {
+              "kind": "opaque",
+              "type": "function"
+            }
+          }
+        },
+        {
+          "depth": 1,
+          "function": "factorial",
+          "line": 4,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 3
+            }
+          }
+        },
+        {
+          "depth": 2,
+          "function": "factorial",
+          "line": 4,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 2
+            }
+          }
+        },
+        {
+          "depth": 3,
+          "function": "factorial",
+          "line": 3,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 1
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 12,
+      "event": "return",
+      "line": 3,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 6,
+          "locals": {
+            "factorial": {
+              "kind": "opaque",
+              "type": "function"
+            }
+          }
+        },
+        {
+          "depth": 1,
+          "function": "factorial",
+          "line": 4,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 3
+            }
+          }
+        },
+        {
+          "depth": 2,
+          "function": "factorial",
+          "line": 4,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 2
+            }
+          }
+        },
+        {
+          "depth": 3,
+          "function": "factorial",
+          "line": 3,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 1
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": [],
+      "return_value": {
+        "kind": "scalar",
+        "type": "int",
+        "value": 1
+      }
+    },
+    {
+      "step": 13,
+      "event": "line",
+      "line": 5,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 6,
+          "locals": {
+            "factorial": {
+              "kind": "opaque",
+              "type": "function"
+            }
+          }
+        },
+        {
+          "depth": 1,
+          "function": "factorial",
+          "line": 4,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 3
+            }
+          }
+        },
+        {
+          "depth": 2,
+          "function": "factorial",
+          "line": 5,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 2
+            },
+            "partial": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 1
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 14,
+      "event": "return",
+      "line": 5,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 6,
+          "locals": {
+            "factorial": {
+              "kind": "opaque",
+              "type": "function"
+            }
+          }
+        },
+        {
+          "depth": 1,
+          "function": "factorial",
+          "line": 4,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 3
+            }
+          }
+        },
+        {
+          "depth": 2,
+          "function": "factorial",
+          "line": 5,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 2
+            },
+            "partial": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 1
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": [],
+      "return_value": {
+        "kind": "scalar",
+        "type": "int",
+        "value": 2
+      }
+    },
+    {
+      "step": 15,
+      "event": "line",
+      "line": 5,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 6,
+          "locals": {
+            "factorial": {
+              "kind": "opaque",
+              "type": "function"
+            }
+          }
+        },
+        {
+          "depth": 1,
+          "function": "factorial",
+          "line": 5,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 3
+            },
+            "partial": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 2
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 16,
+      "event": "return",
+      "line": 5,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 6,
+          "locals": {
+            "factorial": {
+              "kind": "opaque",
+              "type": "function"
+            }
+          }
+        },
+        {
+          "depth": 1,
+          "function": "factorial",
+          "line": 5,
+          "locals": {
+            "n": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 3
+            },
+            "partial": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 2
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": [],
+      "return_value": {
+        "kind": "scalar",
+        "type": "int",
+        "value": 6
+      }
+    },
+    {
+      "step": 17,
+      "event": "return",
+      "line": 6,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 6,
+          "locals": {
+            "factorial": {
+              "kind": "opaque",
+              "type": "function"
+            },
+            "answer": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 6
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": [],
+      "return_value": {
+        "kind": "scalar",
+        "type": "NoneType",
+        "value": null
+      }
+    }
+  ],
+  "status": "ok",
+  "complete": true,
+  "stdout": "",
+  "stderr": "",
+  "resource_limits_applied": true
+}

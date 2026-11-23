@@ -1,0 +1,35 @@
+{
+  "status": "ok",
+  "final": {
+    "inner": [
+      1,
+      2
+    ],
+    "a": [
+      [
+        1,
+        2
+      ]
+    ],
+    "b": [
+      [
+        1,
+        2
+      ],
+      [
+        9
+      ]
+    ]
+  },
+  "different_ref": [
+    [
+      "a",
+      "b"
+    ]
+  ],
+  "shared_first_item": [
+    "a",
+    "b",
+    "inner"
+  ]
+}

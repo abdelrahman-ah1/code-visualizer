@@ -1,0 +1,10 @@
+{
+  "status": "error",
+  "error": "ZeroDivisionError",
+  "exception_line": 3,
+  "at_exception": {
+    "x": 5,
+    "y": 0
+  },
+  "absent": "answer"
+}

@@ -1,0 +1,8 @@
+{
+  "status": "ok",
+  "stdin": "Ada\n",
+  "final": {
+    "name": "Ada"
+  },
+  "stdout": "Hello Ada\n"
+}
