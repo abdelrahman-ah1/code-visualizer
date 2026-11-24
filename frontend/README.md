@@ -1,8 +1,41 @@
-# Milestone 3.5: export a session (M2 replay and M3 structures included)
+# Milestone 4: run your own code (M2 replay, M3 structures and M3.5 export included)
 
-A React + TypeScript interface for the existing `codeviz.trace/1.0` recordings. It reads saved state, never runs Python, and needs no backend.
+A React + TypeScript interface for the existing `codeviz.trace/1.0` recordings. Replay reads saved state and never runs Python. From M4 it can also ask a local backend to record a program you paste. Opening saved recordings and exported sessions still needs no backend.
 
-## What is new in M3.5
+## What is new in M4
+
+- **Write code.** A new panel at the top has a code editor (plain textarea with line numbers, no editor library), an example menu (the fixtures, the M3 programs and four new ones), optional program input, an event limit (500, 1000, 2000) and a time limit (2, 5, 10 seconds). **Run and record** (or Ctrl+Enter) sends the code to the local backend and replays the result. The status chip shows "Backend online" or "Backend offline".
+- **The backend** is a small FastAPI server in `backend/` (see `backend/README.md`). It runs the existing tracer once and returns the trace. It is for trusted programs on your own computer only.
+- **Breakpoints.** Click a line number in the source panel (or focus it and press Enter). Play now stops just before that line runs. **Previous breakpoint** and **Next breakpoint** jump between stops. A breakpoint stops at every recorded `line` event on that line, which is a snapshot taken before the line executes. Lines that never ran in this recording are listed instead of silently ignored. Breakpoints stay when you re-run edited code and are cleared when you open a different recording.
+- **Watch.** Type a variable or path such as `total`, `head.next.value` or `items[0]` and press Add watch. Each watch shows its value at the current step, says "Changed at this step" when it differs from the previous step, and has Previous change / Next change buttons. Nothing is evaluated: values are read from the saved snapshots, so a watch can never run code. Name lookup follows Python: the current function's variables first, then the module's.
+- **Saved recordings still work** with the backend off, and exported session files still open offline. A session file now also has breakpoints and watch, but no editor and no Run.
+- **Honest failures.** An uncaught exception, timeout, event limit and unsupported construct all come back as recordings with their real status. A busy backend (HTTP 429), a rejected request, a server error or a missing backend each show a clear message and never replace the recording on screen.
+- **Performance** was measured, not assumed: see `PERF_REPORT.md`. Stepping stays at one frame in Chrome for 1,806 and 10,000 events, long source files render only the lines that change, and the backend response is built about 12x faster than the framework default and compresses to about 2%.
+- The trace format, the tracer and the M3.5 export are unchanged. Only one new development dependency group is needed, and only for Python (`backend/requirements.txt`).
+
+## Run the whole thing (M4)
+
+Terminal 1, from the repository root (details in `backend/README.md`):
+
+```sh
+python3.12 -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
+pip install -r backend/requirements.txt
+python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
+```
+
+Terminal 2:
+
+```sh
+cd frontend
+npm ci
+npm run dev
+```
+
+Open http://127.0.0.1:5173 (or http://localhost:5173), pick **Example program, 17 reverse linked list**, press **Run and record**, click the line number `10`, press **Next breakpoint** twice, and add the watches `cur.value` and `prev`.
+
+To run all tests: `npm test` (unit), and `npm run test:ui` (Chrome; it starts both servers itself, using `CODEVIZ_PYTHON` to pick the Python that has the backend installed, for example `CODEVIZ_PYTHON=../.venv/bin/python npm run test:ui`).
+
+## What was new in M3.5
 
 - An **Export session (.html)** button appears under the recording name once a trace is loaded. It downloads one file, for example `12_linked_list_insert.session.html`.
 - Double-click that file (or drag it into any modern browser). It replays the recording with no server, no internet and no install. It opens in a "Shared session" view: no example menu, no file picker, no export button. Everything else (stepping, structures, dark mode) works as before.
