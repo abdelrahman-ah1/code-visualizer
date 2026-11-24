@@ -1,0 +1,6 @@
+# M4 local backend. All free and open source (MIT / BSD licenses).
+# Pinned to the versions this milestone was tested with.
+fastapi==0.162.5
+uvicorn==0.54.0
+# Only needed to run the API tests (FastAPI's TestClient uses it).
+httpx==0.28.1
