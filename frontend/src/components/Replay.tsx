@@ -1,34 +1,146 @@
-import { useMemo } from 'react';
-import type { Trace } from '../types';
-import { usePlayback } from '../usePlayback';
-import { eventMeaning, outputAt, statusMeaning } from '../replay';
-import { Controls } from './Controls';
-import { Source } from './Source';
-import { Memory } from './Memory';
-import { Structures } from './Structures';
-import { buildScenes } from '../structures';
-import { ValueView } from './ValueView';
-import { Watch } from './Watch';
-import { buildLineIndex, stopIndexes, unreachedLines } from '../breakpoints';
-interface Props { trace: Trace; breakpoints: ReadonlySet<number>; onToggleBreakpoint: (line: number) => void; watches: string[]; onAddWatch: (text: string) => string | null; onRemoveWatch: (text: string) => void }
-export function Replay({ trace, breakpoints, onToggleBreakpoint, watches, onAddWatch, onRemoveWatch }: Props) {
-  // Built once per trace; stops are recomputed only when the chosen lines change.
-  const lineIndex = useMemo(() => buildLineIndex(trace.events), [trace]);
-  const stops = useMemo(() => stopIndexes(lineIndex, breakpoints), [lineIndex, breakpoints]);
-  const unreached = useMemo(() => unreachedLines(lineIndex, breakpoints), [lineIndex, breakpoints]);
-  const p = usePlayback(trace.events.length, stops), event = trace.events[p.index];
-  const scenes = useMemo(() => buildScenes(trace), [trace]);
-  const lines = useMemo(() => trace.source.split('\n'), [trace.source]);
-  const atEnd = !trace.events.length || p.index === trace.events.length - 1;
-  return <><div className={`run-status ${trace.status === 'ok' ? '' : 'warning'}`}><b>Recorded run: {trace.status}</b><span>{statusMeaning[trace.status]}. {trace.complete ? 'Final record captured.' : 'Incomplete capture.'}</span><small>{trace.runtime.implementation} {trace.runtime.version}{trace.error ? ` · ${trace.error.type}${trace.error.line ? ` on line ${trace.error.line}` : ''}` : ''}</small></div>
-    <Controls playback={p} count={trace.events.length} stops={stops}/>
-    <p className="hint breakpoint-note" data-testid="breakpoint-note">{breakpoints.size ? `Breakpoints: line ${[...breakpoints].sort((a, b) => a - b).join(', ')}. Play stops before each one runs.${unreached.length ? ` Never reached in this recording: ${unreached.join(', ')}.` : ''}` : 'Click a line number in the source to set a breakpoint. Breakpoints stop at recorded steps, they do not re-run the program.'}</p>
-    <div className="event-status" role="status">{event ? <><b>{event.event} · step {event.step} · line {event.line}</b><span>{eventMeaning(event)}</span>{p.atBreakpoint && <span className="bp-hit" data-testid="breakpoint-hit">Breakpoint · line {event.line}</span>}{event.exception_type && <span className="warning">{event.exception_type}</span>}{event.return_value && <span>Recorded return value: <ValueView value={event.return_value}/></span>}{event.truncated.length > 0 && <span className="warning">Snapshot omissions: {event.truncated.join(', ')}</span>}</> : <b>No snapshots captured. The run status and final output still apply.</b>}</div>
-    {event && <Structures scene={scenes[p.index]} event={event} prev={trace.events[p.index - 1]} prevScene={scenes[p.index - 1]}/>}
-    {event && <Watch trace={trace} index={p.index} watches={watches} onAdd={onAddWatch} onRemove={onRemoveWatch} onSeek={p.seek}/>}
-    <div className="workspace"><Source lines={lines} line={event?.line} breakpoints={breakpoints} onToggleBreakpoint={onToggleBreakpoint}/>{event && <Memory event={event}/>}</div>
-    <section className="panel output"><h2>Captured output <small>{atEnd ? 'final record, if available' : 'at this snapshot'}</small></h2>
-      {(trace.stdout === undefined || trace.stderr === undefined) && <p className="warning">Final output is missing. At the end, the last checkpoint is shown and may lag.</p>}
-      <div className="output-grid">{(['stdout', 'stderr'] as const).map((stream) => <div key={stream}><h3>{stream}</h3><pre data-testid={stream}>{outputAt(trace, p.index, stream) || '(empty)'}</pre></div>)}</div>
-    </section><p className="hint">Replay reads saved states only. It does not run code or undo the original program's side effects. Complete capture does not guarantee a complete heap.</p></>;
-}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, system-ui, sans-serif; }
+main { --bg:#10171d; --panel:#182229; --raised:#202e36; --ink:#ebf2f5; --muted:#a6b9c4; --line:#34444e; --accent:#79dcc0; --chosen:#20463f; --warn:#ffd28a; min-height:100vh; background:var(--bg); color:var(--ink); padding:32px; line-height:1.55; }
+main[data-theme=light] { --bg:#f1f5f6; --panel:#fff; --raised:#edf3f4; --ink:#172a35; --muted:#4c6371; --line:#c7d3d9; --accent:#006954; --chosen:#d6eee5; --warn:#825000; }
+.app-shell { max-width:1500px; margin:auto; }
+header { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:28px; }
+h1 { font-size:clamp(26px,3vw,40px); letter-spacing:-.04em; font-weight:600; margin:4px 0; line-height:1.15; }
+p { margin:8px 0; }
+h2 { margin:0 0 10px; font-size:17px; font-weight:600; }
+h3 { font-size:14px; margin:0 0 8px; }
+small,.hint,.subtitle { color:var(--muted); }
+small { font-size:12px; font-weight:400; }
+h2 small,h3 small { margin-left:8px; }
+.hint { font-size:12px; overflow-wrap:anywhere; }
+.eyebrow { font-size:11px; letter-spacing:.13em; color:var(--accent); font-weight:600; }
+button,select,input { font:inherit; }
+button,select,.file-label { border:1px solid var(--line); border-radius:7px; background:var(--raised); color:var(--ink); padding:10px 14px; min-height:44px; cursor:pointer; font-size:13px; }
+button:hover:not(:disabled),.file-label:hover { border-color:var(--accent); }
+button:disabled { opacity:.4; cursor:default; }
+button.primary { background:var(--accent); color:var(--bg); border-color:var(--accent); font-weight:650; }
+:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+.loader { display:flex; align-items:center; gap:20px; border-block:1px solid var(--line); padding:18px 0; flex-wrap:wrap; }
+.file-label { position:relative; display:inline-flex; align-items:center; font-weight:600; overflow:hidden; }
+.file-label input { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; }
+.file-label:focus-within { outline:3px solid var(--accent); }
+.example-label { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:10px; }
+.recording-name { font-size:12px; color:var(--muted); margin:20px 0 8px; overflow-wrap:anywhere; }
+.run-status { display:flex; align-items:center; flex-wrap:wrap; gap:8px 18px; border-left:3px solid var(--accent); background:var(--panel); padding:12px 16px; font-size:13px; }
+.run-status small { margin-left:auto; }
+.controls { display:flex; align-items:center; flex-wrap:wrap; gap:22px; padding:20px 0; }
+.control-buttons { display:flex; gap:6px; flex-wrap:wrap; }
+.timeline { flex:1; min-width:140px; }
+.timeline label { font-size:12px; color:var(--muted); display:block; }
+.timeline input { width:100%; accent-color:var(--accent); height:24px; }
+.speed { font-size:12px; display:flex; gap:8px; align-items:center; }
+.event-status { border:1px solid var(--line); border-radius:8px; padding:12px 16px; display:flex; gap:4px 20px; flex-wrap:wrap; font-size:13px; margin-bottom:16px; }
+.event-status b { color:var(--accent); }
+.workspace { display:grid; grid-template-columns:1.15fr 1fr 1fr; align-items:start; gap:16px; }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:9px; padding:18px; min-width:0; }
+.source-panel { padding-inline:0; }
+.source-panel h2 { padding-inline:18px; }
+.source { position:relative; max-height:590px; overflow:auto; font-size:13px; padding-block:8px; }
+.code-line { display:flex; min-width:max-content; padding:4px 18px 4px 0; border-left:3px solid transparent; line-height:1.6; }
+.code-line.active { background:var(--chosen); border-left-color:var(--accent); }
+.line-number { flex:none; width:46px; padding-right:12px; text-align:right; color:var(--muted); user-select:none; }
+code,pre,dt,.scalar,.ref { font-family:'SFMono-Regular',Consolas,monospace; }
+code { white-space:pre; }
+.frame,.heap-node { background:var(--raised); padding:12px; border-radius:6px; margin:10px 0; scroll-margin-top:20px; }
+.heap-node:target { outline:2px solid var(--accent); }
+dl { margin:0; }
+.binding { display:grid; grid-template-columns:minmax(55px,.8fr) minmax(0,1fr); gap:12px; padding:5px 0; border-top:1px solid var(--line); font-size:12px; }
+dt,dd { margin:0; overflow-wrap:anywhere; min-width:0; }
+.ref { color:var(--accent); font-weight:600; text-decoration:none; }
+a.ref:hover { text-decoration:underline; }
+.warning { color:var(--warn); }
+.error { background:var(--panel); border:1px solid #f0787e; color:#f0787e; padding:18px; margin:18px 0; border-radius:8px; overflow-wrap:anywhere; }
+main[data-theme=light] .error { color:#a01628; border-color:#a01628; }
+.empty { color:var(--muted); font-size:13px; padding:16px 0; }
+.output { margin:16px 0 10px; }
+.output-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+pre { background:var(--bg); padding:12px; border-radius:5px; margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; min-height:60px; }
+.welcome { padding:80px 20px; text-align:center; max-width:600px; margin:auto; }
+.welcome-number { color:var(--accent); font-size:24px; letter-spacing:.15em; }
+.welcome h2 { font-size:26px; margin-top:20px; }
+.welcome p { color:var(--muted); margin:14px 0 22px; }
+footer { color:var(--muted); font-size:11px; border-top:1px solid var(--line); margin-top:24px; padding-top:16px; }
+@media(max-width:1050px) { .workspace { grid-template-columns:1fr 1fr; } .source-panel { grid-column:1 / -1; } .source { max-height:320px; } }
+@media(max-width:600px) { main { padding:20px 14px; } header { align-items:flex-start; flex-direction:column; } .workspace,.output-grid { grid-template-columns:1fr; } .source-panel { grid-column:auto; } .controls { gap:12px; } .timeline { flex-basis:100%; } .example-label { align-items:flex-start; flex-direction:column; } .example-label select { max-width:100%; } .loader { gap:14px; } .run-status { align-items:flex-start; flex-direction:column; } .run-status small { margin-left:0; } .control-buttons button { padding-inline:10px; } .welcome { padding:42px 4px; } }
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; animation:none!important; transition:none!important; } }
+
+/* ---- Milestone 3: structures view ---- */
+.sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; list-style:none; }
+.structures { margin-bottom:16px; }
+.structure-scroll { overflow-x:auto; padding-bottom:6px; max-width:100%; }
+.structure-scroll svg { display:block; max-width:none; }
+.vnode { transition:transform .35s ease; }
+.node-box,.cell-box { fill:var(--raised); stroke:var(--line); stroke-width:1.5; }
+.cell-box.omitted { stroke-dasharray:4 3; }
+.node-divider { stroke:var(--line); stroke-width:1.5; }
+.node-main,.cell-value { fill:var(--ink); font:600 15px 'SFMono-Regular',Consolas,monospace; }
+.node-rest { fill:var(--muted); font:10px 'SFMono-Regular',Consolas,monospace; }
+.node-id,.cell-index { fill:var(--muted); font:10px 'SFMono-Regular',Consolas,monospace; }
+.node-null { fill:var(--muted); font-size:16px; }
+.node-dot { fill:var(--accent); }
+.arrow { fill:none; stroke:var(--accent); stroke-width:2; animation:arrow-in .35s ease both; }
+.arrowhead { fill:var(--accent); }
+.tag rect { fill:var(--chosen); stroke:var(--accent); stroke-width:1; }
+.tag text { fill:var(--ink); font:600 11px 'SFMono-Regular',Consolas,monospace; }
+.tag path { fill:var(--accent); }
+.enter { animation:pop .4s ease both; transform-box:fill-box; transform-origin:center; }
+.changed .node-box,.changed .cell-box { animation:flash 1.1s ease-out; }
+@keyframes pop { from { opacity:0; transform:scale(.7); } to { opacity:1; transform:scale(1); } }
+@keyframes flash { 0% { stroke:var(--warn); stroke-width:4; fill:var(--chosen); } 100% { stroke:var(--line); stroke-width:1.5; } }
+@keyframes arrow-in { from { opacity:0; } to { opacity:1; } }
+@media(max-width:600px) { .structures { padding:14px 10px; } }
+
+/* ---- Milestone 4: editor, run panel, breakpoints, watch ---- */
+.run-panel { margin-bottom:18px; }
+.run-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+.backend-badge { font-size:12px; border:1px solid var(--line); border-radius:999px; padding:4px 12px; color:var(--muted); }
+.backend-badge.online { color:var(--accent); border-color:var(--accent); }
+.backend-badge.offline { color:var(--warn); border-color:var(--warn); }
+.run-bar { display:flex; gap:18px; flex-wrap:wrap; margin:6px 0 12px; }
+.editor { display:flex; border:1px solid var(--line); border-radius:7px; background:var(--bg); height:300px; overflow:hidden; }
+.editor .gutter { margin:0; padding:12px 10px 12px 12px; min-height:0; border-radius:0; background:var(--raised); color:var(--muted); text-align:right; overflow:hidden; white-space:pre; user-select:none; font-size:13px; line-height:1.6; min-width:46px; }
+.editor textarea { flex:1; min-width:0; border:0; background:transparent; color:var(--ink); resize:none; padding:12px; font:13px/1.6 'SFMono-Regular',Consolas,monospace; white-space:pre; overflow:auto; tab-size:4; }
+.editor textarea:focus-visible { outline:3px solid var(--accent); outline-offset:-3px; }
+.stdin { margin-top:10px; font-size:12px; color:var(--muted); }
+.stdin textarea { display:block; width:100%; margin-top:6px; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:8px; font:12px 'SFMono-Regular',Consolas,monospace; }
+.run-actions { display:flex; align-items:center; gap:8px 16px; flex-wrap:wrap; margin-top:12px; }
+.run-panel .error { margin:12px 0 0; }
+.offline-help { border:1px dashed var(--warn); border-radius:8px; padding:12px 16px; margin-top:12px; font-size:13px; }
+.mono { font-family:'SFMono-Regular',Consolas,monospace; }
+.line-number { background:none; border:0; border-radius:0; min-height:0; min-width:46px; font:inherit; font-size:13px; cursor:pointer; padding-block:0; position:relative; }
+.line-number:hover { color:var(--accent); }
+.line-number.bp-on { color:#fff; background:#c43d4b; font-weight:700; }
+main[data-theme=light] .line-number.bp-on { background:#a01628; }
+.line-number:focus-visible { outline-offset:-3px; }
+.bp-hit { color:#ff9aa2; font-weight:600; }
+main[data-theme=light] .bp-hit { color:#a01628; }
+.breakpoint-note { margin:-8px 0 12px; }
+.watch-panel { margin-bottom:16px; }
+.watch-form { display:flex; gap:10px; flex-wrap:wrap; }
+.watch-form input { flex:1; min-width:180px; min-height:44px; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:8px 12px; font-family:'SFMono-Regular',Consolas,monospace; font-size:13px; }
+.watch-list { list-style:none; padding:0; margin:12px 0 0; display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px; }
+.watch-row { background:var(--raised); border-radius:6px; padding:10px 12px; min-width:0; }
+.watch-head { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.watch-name { color:var(--accent); font-weight:600; font-size:13px; overflow-wrap:anywhere; }
+.watch-remove,.watch-jump button { min-height:32px; padding:2px 10px; font-size:12px; }
+.watch-value { font:13px 'SFMono-Regular',Consolas,monospace; margin:6px 0; overflow-wrap:anywhere; min-height:20px; }
+.watch-value.muted-state { color:var(--muted); font-style:italic; }
+.watch-meta { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; }
+.watch-jump { display:flex; gap:6px; }
+.watch-changed { color:var(--warn); font-weight:600; }
+@media(max-width:600px) { .editor { height:240px; } .run-bar { gap:10px; flex-direction:column; } }
+
+/* M5: diagnostics panel */
+.diagnostics ul { list-style:none; margin:8px 0; padding:0; display:grid; gap:8px; }
+.diag { border-left:4px solid var(--muted, #8a93a5); padding:6px 12px; background:rgba(127,127,127,.08); border-radius:4px; }
+.diag.error { border-left-color:#f0787e; }
+.diag.warning { border-left-color:#e3b341; }
+.diag p { margin:4px 0 0; overflow-wrap:anywhere; }
+.diag-source, .diag-line { margin-left:10px; font-size:.85em; opacity:.8; }
+.run-status .overall { display:block; font-size:1.05em; color:var(--danger, #ff8a80); margin-bottom:4px; }
+.run-status.warning { border-left-color:#e0a030; }
+.run-status:has(.overall) { border-left-color:#ff6b6b; }
