@@ -20,15 +20,19 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, Response
+from typing import Literal, Optional
+
 from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from trace_capture import capture  # noqa: E402  (needs ROOT on sys.path first)
+from cpp_trace import capture_cpp, find_tools, tool_version  # noqa: E402
 
 # Where the example programs live. Each .py file is one example.
 EXAMPLE_DIRS = [ROOT / "fixtures", ROOT / "frontend" / "programs", ROOT / "backend" / "examples"]
+CPP_EXAMPLE_DIR = ROOT / "backend" / "cpp_examples"
 # Hosts the browser may use to reach this server, and pages allowed to call it.
 # The Vite dev server proxies /api, so the Origin is the dev server's address.
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
@@ -85,13 +89,20 @@ class TraceRequest(BaseModel):
     # Bounds mirror trace_capture.capture(); it re-validates them, this gives early clear errors.
     source: str = Field(max_length=65536)
     stdin: str = Field(default="", max_length=8192)
-    timeout: float = Field(default=2.0, ge=0.05, le=10)
+    language: Literal["python", "cpp"] = "python"
+    timeout: Optional[float] = Field(default=None, ge=0.05, le=10)   # default: 2 s Python, 5 s C++
     max_events: int = Field(default=500, ge=1, le=2000)
+
+
+def cpp_status():
+    """Is the C++ toolchain installed? Looked up on every call so installing gdb needs no restart."""
+    gdb, gpp = find_tools()
+    return {"available": bool(gdb and gpp), "gpp": bool(gpp), "gdb": bool(gdb)}
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "python": sys.version.split()[0], "max_concurrent_runs": MAX_CONCURRENT_RUNS}
+    return {"status": "ok", "python": sys.version.split()[0], "max_concurrent_runs": MAX_CONCURRENT_RUNS, "cpp": cpp_status()}
 
 
 def title_of(stem: str) -> str:
@@ -108,7 +119,11 @@ def examples():
                 found[path.stem] = path
     stdin = {"08_stdout_input": "Ada\n"}  # the one baseline program that reads input
     items = [{"id": stem, "title": title_of(stem), "source": path.read_text(encoding="utf-8"),
-              "stdin": stdin.get(stem, "")} for stem, path in sorted(found.items())]
+              "stdin": stdin.get(stem, ""), "language": "python"} for stem, path in sorted(found.items())]
+    for path in sorted(CPP_EXAMPLE_DIR.glob("*.cpp")):
+        if path.stat().st_size <= 65536:
+            items.append({"id": "cpp_" + path.stem, "title": "C++ " + title_of(path.stem), "source": path.read_text(encoding="utf-8"),
+                          "stdin": "", "language": "cpp"})
     return {"examples": items}
 
 
@@ -125,9 +140,14 @@ def trace(req: TraceRequest):
     try:
         started = time.perf_counter()
         try:
-            result = capture(req.source, req.stdin, req.timeout, req.max_events)
-        except ValueError as exc:  # size limits checked in bytes by capture()
+            if req.language == "cpp":
+                result = capture_cpp(req.source, req.stdin, req.timeout or 5.0, req.max_events)
+            else:
+                result = capture(req.source, req.stdin, req.timeout or 2.0, req.max_events)
+        except ValueError as exc:  # size limits checked in bytes by the launchers
             return fail(413, "too_large", str(exc))
+        except Exception as exc:  # a launcher bug must not take the server down: report it, stay up
+            return fail(500, "tracer_failed", f"The tracer failed unexpectedly ({type(exc).__name__}). The server is still running; try again.")
         captured = time.perf_counter()
         # json.dumps directly: returning the dict would make FastAPI walk all ~100k values first.
         body = json.dumps(result, ensure_ascii=True, allow_nan=False)
