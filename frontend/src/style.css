@@ -93,3 +93,43 @@ footer { color:var(--muted); font-size:11px; border-top:1px solid var(--line); m
 @keyframes flash { 0% { stroke:var(--warn); stroke-width:4; fill:var(--chosen); } 100% { stroke:var(--line); stroke-width:1.5; } }
 @keyframes arrow-in { from { opacity:0; } to { opacity:1; } }
 @media(max-width:600px) { .structures { padding:14px 10px; } }
+
+/* ---- Milestone 4: editor, run panel, breakpoints, watch ---- */
+.run-panel { margin-bottom:18px; }
+.run-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+.backend-badge { font-size:12px; border:1px solid var(--line); border-radius:999px; padding:4px 12px; color:var(--muted); }
+.backend-badge.online { color:var(--accent); border-color:var(--accent); }
+.backend-badge.offline { color:var(--warn); border-color:var(--warn); }
+.run-bar { display:flex; gap:18px; flex-wrap:wrap; margin:6px 0 12px; }
+.editor { display:flex; border:1px solid var(--line); border-radius:7px; background:var(--bg); height:300px; overflow:hidden; }
+.editor .gutter { margin:0; padding:12px 10px 12px 12px; min-height:0; border-radius:0; background:var(--raised); color:var(--muted); text-align:right; overflow:hidden; white-space:pre; user-select:none; font-size:13px; line-height:1.6; min-width:46px; }
+.editor textarea { flex:1; min-width:0; border:0; background:transparent; color:var(--ink); resize:none; padding:12px; font:13px/1.6 'SFMono-Regular',Consolas,monospace; white-space:pre; overflow:auto; tab-size:4; }
+.editor textarea:focus-visible { outline:3px solid var(--accent); outline-offset:-3px; }
+.stdin { margin-top:10px; font-size:12px; color:var(--muted); }
+.stdin textarea { display:block; width:100%; margin-top:6px; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:8px; font:12px 'SFMono-Regular',Consolas,monospace; }
+.run-actions { display:flex; align-items:center; gap:8px 16px; flex-wrap:wrap; margin-top:12px; }
+.run-panel .error { margin:12px 0 0; }
+.offline-help { border:1px dashed var(--warn); border-radius:8px; padding:12px 16px; margin-top:12px; font-size:13px; }
+.mono { font-family:'SFMono-Regular',Consolas,monospace; }
+.line-number { background:none; border:0; border-radius:0; min-height:0; min-width:46px; font:inherit; font-size:13px; cursor:pointer; padding-block:0; position:relative; }
+.line-number:hover { color:var(--accent); }
+.line-number.bp-on { color:#fff; background:#c43d4b; font-weight:700; }
+main[data-theme=light] .line-number.bp-on { background:#a01628; }
+.line-number:focus-visible { outline-offset:-3px; }
+.bp-hit { color:#ff9aa2; font-weight:600; }
+main[data-theme=light] .bp-hit { color:#a01628; }
+.breakpoint-note { margin:-8px 0 12px; }
+.watch-panel { margin-bottom:16px; }
+.watch-form { display:flex; gap:10px; flex-wrap:wrap; }
+.watch-form input { flex:1; min-width:180px; min-height:44px; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:8px 12px; font-family:'SFMono-Regular',Consolas,monospace; font-size:13px; }
+.watch-list { list-style:none; padding:0; margin:12px 0 0; display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px; }
+.watch-row { background:var(--raised); border-radius:6px; padding:10px 12px; min-width:0; }
+.watch-head { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.watch-name { color:var(--accent); font-weight:600; font-size:13px; overflow-wrap:anywhere; }
+.watch-remove,.watch-jump button { min-height:32px; padding:2px 10px; font-size:12px; }
+.watch-value { font:13px 'SFMono-Regular',Consolas,monospace; margin:6px 0; overflow-wrap:anywhere; min-height:20px; }
+.watch-value.muted-state { color:var(--muted); font-style:italic; }
+.watch-meta { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; }
+.watch-jump { display:flex; gap:6px; }
+.watch-changed { color:var(--warn); font-weight:600; }
+@media(max-width:600px) { .editor { height:240px; } .run-bar { gap:10px; flex-direction:column; } }
