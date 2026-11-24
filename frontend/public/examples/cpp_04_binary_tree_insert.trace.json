@@ -1,0 +1,2021 @@
+{
+ "schema_version": "codeviz.trace/1.0",
+ "runtime": {
+  "implementation": "g++ + gdb",
+  "version": "g++ 11.4.0, gdb 12.1"
+ },
+ "source": "struct T { int k; T* left; T* right; };\nT* insert(T* r, int k) {\n    if (!r) return new T{k, nullptr, nullptr};\n    if (k < r->k) r->left = insert(r->left, k); else r->right = insert(r->right, k);\n    return r;\n}\nint main() {\n    T* root = nullptr;\n    int keys[3] = {5, 2, 8};\n    for (int i = 0; i < 3; i++) root = insert(root, keys[i]);\n    return root->k;\n}\n",
+ "limits": {
+  "wall_seconds": 5.0,
+  "events": 500,
+  "output_chars": 8192
+ },
+ "events": [
+  {
+   "step": 0,
+   "event": "call",
+   "line": 7,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 7,
+     "locals": {}
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 1,
+   "event": "line",
+   "line": 8,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 8,
+     "locals": {}
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 2,
+   "event": "line",
+   "line": 9,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 9,
+     "locals": {
+      "root": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 3,
+   "event": "line",
+   "line": 10,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 10,
+     "locals": {
+      "root": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 4,
+   "event": "call",
+   "line": 3,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 10,
+     "locals": {
+      "root": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "insert",
+     "line": 3,
+     "locals": {
+      "r": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 5,
+   "event": "return",
+   "line": 6,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 10,
+     "locals": {
+      "root": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "insert",
+     "line": 6,
+     "locals": {
+      "r": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    },
+    "o2": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "ref",
+    "id": "o2"
+   }
+  },
+  {
+   "step": 6,
+   "event": "call",
+   "line": 3,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 10,
+     "locals": {
+      "root": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "insert",
+     "line": 3,
+     "locals": {
+      "r": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    },
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 7,
+   "event": "line",
+   "line": 4,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 10,
+     "locals": {
+      "root": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "insert",
+     "line": 4,
+     "locals": {
+      "r": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    },
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 8,
+   "event": "call",
+   "line": 3,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 10,
+     "locals": {
+      "root": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "insert",
+     "line": 4,
+     "locals": {
+      "r": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    },
+    {
+     "depth": 2,
+     "function": "insert",
+     "line": 3,
+     "locals": {
+      "r": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    },
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 9,
+   "event": "return",
+   "line": 6,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 10,
+     "locals": {
+      "root": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "insert",
+     "line": 4,
+     "locals": {
+      "r": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    },
+    {
+     "depth": 2,
+     "function": "insert",
+     "line": 6,
+     "locals": {
+      "r": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    },
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    },
+    "o3": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "ref",
+    "id": "o3"
+   }
+  },
+  {
+   "step": 10,
+   "event": "line",
+   "line": 5,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 10,
+     "locals": {
+      "root": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "insert",
+     "line": 5,
+     "locals": {
+      "r": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      "left": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    },
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    },
+    "o3": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 11,
+   "event": "return",
+   "line": 6,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 10,
+     "locals": {
+      "root": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "insert",
+     "line": 6,
+     "locals": {
+      "r": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      "left": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    },
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    },
+    "o3": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "ref",
+    "id": "o2"
+   }
+  },
+  {
+   "step": 12,
+   "event": "call",
+   "line": 3,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 10,
+     "locals": {
+      "root": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "insert",
+     "line": 3,
+     "locals": {
+      "r": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      "left": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    },
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    },
+    "o3": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 13,
+   "event": "line",
+   "line": 4,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 10,
+     "locals": {
+      "root": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "insert",
+     "line": 4,
+     "locals": {
+      "r": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      "left": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    },
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    },
+    "o3": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 14,
+   "event": "call",
+   "line": 3,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 10,
+     "locals": {
+      "root": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "insert",
+     "line": 4,
+     "locals": {
+      "r": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     }
+    },
+    {
+     "depth": 2,
+     "function": "insert",
+     "line": 3,
+     "locals": {
+      "r": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      "left": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    },
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    },
+    "o3": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 15,
+   "event": "return",
+   "line": 6,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 10,
+     "locals": {
+      "root": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "insert",
+     "line": 4,
+     "locals": {
+      "r": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     }
+    },
+    {
+     "depth": 2,
+     "function": "insert",
+     "line": 6,
+     "locals": {
+      "r": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      "left": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    },
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    },
+    "o4": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    },
+    "o3": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "ref",
+    "id": "o4"
+   }
+  },
+  {
+   "step": 16,
+   "event": "line",
+   "line": 5,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 10,
+     "locals": {
+      "root": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "insert",
+     "line": 5,
+     "locals": {
+      "r": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      "left": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "right": {
+       "kind": "ref",
+       "id": "o4"
+      }
+     }
+    },
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    },
+    "o3": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    },
+    "o4": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 17,
+   "event": "return",
+   "line": 6,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 10,
+     "locals": {
+      "root": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "insert",
+     "line": 6,
+     "locals": {
+      "r": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      "left": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "right": {
+       "kind": "ref",
+       "id": "o4"
+      }
+     }
+    },
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    },
+    "o3": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    },
+    "o4": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "ref",
+    "id": "o2"
+   }
+  },
+  {
+   "step": 18,
+   "event": "line",
+   "line": 11,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 11,
+     "locals": {
+      "root": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      "left": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "right": {
+       "kind": "ref",
+       "id": "o4"
+      }
+     }
+    },
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    },
+    "o3": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    },
+    "o4": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 19,
+   "event": "return",
+   "line": 12,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 12,
+     "locals": {
+      "root": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "keys": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      "left": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "right": {
+       "kind": "ref",
+       "id": "o4"
+      }
+     }
+    },
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb2c",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      }
+     ]
+    },
+    "o3": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    },
+    "o4": {
+     "type": "T",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "k": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 8
+      },
+      "left": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      },
+      "right": {
+       "kind": "scalar",
+       "type": "T *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "scalar",
+    "type": "int",
+    "value": 5
+   }
+  }
+ ],
+ "diagnostics": [
+  {
+   "source": "sanitizer",
+   "severity": "warning",
+   "kind": "memory-leak",
+   "message": "Memory leak: 24 bytes in 1 object(s) were never freed",
+   "line": 3
+  },
+  {
+   "source": "runtime",
+   "severity": "info",
+   "kind": "exit-code",
+   "message": "The program finished with exit code 5."
+  }
+ ],
+ "compile_ms": 82.9,
+ "trace_ms": 310.0,
+ "status": "ok",
+ "complete": true,
+ "stdout": "",
+ "stderr": "",
+ "exit_code": 5
+}
