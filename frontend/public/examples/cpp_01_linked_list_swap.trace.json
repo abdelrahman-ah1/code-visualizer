@@ -1,0 +1,2750 @@
+{
+ "schema_version": "codeviz.trace/1.0",
+ "runtime": {
+  "implementation": "g++ + gdb",
+  "version": "g++ 11.4.0, gdb 12.1"
+ },
+ "source": "#include <iostream>\n\nstruct Node {\n    int value;\n    Node* next;\n};\n\nNode* push_front(Node* head, int value) {\n    return new Node{value, head};\n}\n\n// Swap the first two nodes and return the new head.\nNode* swap_first_two(Node* head) {\n    if (head == nullptr || head->next == nullptr) return head;\n    Node* second = head->next;\n    head->next = second->next;\n    second->next = head;\n    return second;\n}\n\nint main() {\n    Node* head = nullptr;\n    for (int i = 3; i >= 1; i--) {\n        head = push_front(head, i * 10);\n    }\n    head = swap_first_two(head);\n    for (Node* n = head; n != nullptr; n = n->next) {\n        std::cout << n->value << \" \";\n    }\n    std::cout << \"\\n\";\n    while (head != nullptr) {\n        Node* next = head->next;\n        delete head;\n        head = next;\n    }\n    return 0;\n}\n",
+ "limits": {
+  "wall_seconds": 5.0,
+  "events": 500,
+  "output_chars": 8192
+ },
+ "events": [
+  {
+   "step": 0,
+   "event": "call",
+   "line": 22,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 22,
+     "locals": {}
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 1,
+   "event": "line",
+   "line": 23,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 23,
+     "locals": {
+      "head": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 2,
+   "event": "line",
+   "line": 24,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 24,
+     "locals": {
+      "head": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 3
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 3,
+   "event": "call",
+   "line": 9,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 24,
+     "locals": {
+      "head": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 3
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "push_front",
+     "line": 9,
+     "locals": {
+      "head": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      },
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 4,
+   "event": "return",
+   "line": 10,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 24,
+     "locals": {
+      "head": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 3
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "push_front",
+     "line": 10,
+     "locals": {
+      "head": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      },
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "ref",
+    "id": "o1"
+   }
+  },
+  {
+   "step": 5,
+   "event": "line",
+   "line": 23,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 23,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 3
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 6,
+   "event": "line",
+   "line": 24,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 24,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 7,
+   "event": "call",
+   "line": 9,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 24,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "push_front",
+     "line": 9,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 8,
+   "event": "return",
+   "line": 10,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 24,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "push_front",
+     "line": 10,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    },
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "ref",
+    "id": "o2"
+   }
+  },
+  {
+   "step": 9,
+   "event": "line",
+   "line": 23,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 23,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 10,
+   "event": "line",
+   "line": 24,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 24,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 11,
+   "event": "call",
+   "line": 9,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 24,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "push_front",
+     "line": 9,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 12,
+   "event": "return",
+   "line": 10,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 24,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "push_front",
+     "line": 10,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "ref",
+    "id": "o3"
+   }
+  },
+  {
+   "step": 13,
+   "event": "line",
+   "line": 23,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 23,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "i": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    },
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 14,
+   "event": "line",
+   "line": 26,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 26,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    },
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 15,
+   "event": "call",
+   "line": 14,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 26,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "swap_first_two",
+     "line": 14,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    },
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 16,
+   "event": "line",
+   "line": 15,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 26,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "swap_first_two",
+     "line": 15,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    },
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 17,
+   "event": "line",
+   "line": 16,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 26,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "swap_first_two",
+     "line": 16,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "second": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    },
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 18,
+   "event": "line",
+   "line": 17,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 26,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "swap_first_two",
+     "line": 17,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "second": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 19,
+   "event": "line",
+   "line": 18,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 26,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "swap_first_two",
+     "line": 18,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "second": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 20,
+   "event": "return",
+   "line": 19,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 26,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "swap_first_two",
+     "line": 19,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "second": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "ref",
+    "id": "o2"
+   }
+  },
+  {
+   "step": 21,
+   "event": "line",
+   "line": 27,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 27,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 22,
+   "event": "line",
+   "line": 28,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 28,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "n": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 23,
+   "event": "line",
+   "line": 27,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 27,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "n": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "20 ",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 24,
+   "event": "line",
+   "line": 28,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 28,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "n": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "20 ",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 25,
+   "event": "line",
+   "line": 27,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 27,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "n": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "20 10 ",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 26,
+   "event": "line",
+   "line": 28,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 28,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "n": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    },
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    }
+   },
+   "stdout": "20 10 ",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 27,
+   "event": "line",
+   "line": 27,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 27,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "n": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    },
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    }
+   },
+   "stdout": "20 10 30 ",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 28,
+   "event": "line",
+   "line": 30,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 30,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "20 10 30 ",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 29,
+   "event": "line",
+   "line": 31,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 31,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "20 10 30 \n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 30,
+   "event": "line",
+   "line": 32,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 32,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "20 10 30 \n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 31,
+   "event": "line",
+   "line": 33,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 33,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aed0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 20
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "20 10 30 \n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 32,
+   "event": "line",
+   "line": 34,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 34,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o4"
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o4": {
+     "type": "Node",
+     "opaque": true,
+     "freed": true,
+     "storage": "heap",
+     "address": "0x55555556aed0"
+    },
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "20 10 30 \n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 33,
+   "event": "line",
+   "line": 31,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 31,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "20 10 30 \n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 34,
+   "event": "line",
+   "line": 32,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 32,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "20 10 30 \n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 35,
+   "event": "line",
+   "line": 33,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 33,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o3": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aef0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 10
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "20 10 30 \n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 36,
+   "event": "line",
+   "line": 34,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 34,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o5"
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o5": {
+     "type": "Node",
+     "opaque": true,
+     "freed": true,
+     "storage": "heap",
+     "address": "0x55555556aef0"
+    },
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "20 10 30 \n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 37,
+   "event": "line",
+   "line": 31,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 31,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "20 10 30 \n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 38,
+   "event": "line",
+   "line": 32,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 32,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "next": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "20 10 30 \n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 39,
+   "event": "line",
+   "line": 33,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 33,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 30
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "20 10 30 \n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 40,
+   "event": "line",
+   "line": 34,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 34,
+     "locals": {
+      "head": {
+       "kind": "ref",
+       "id": "o6"
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o6": {
+     "type": "Node",
+     "opaque": true,
+     "freed": true,
+     "storage": "heap",
+     "address": "0x55555556aeb0"
+    }
+   },
+   "stdout": "20 10 30 \n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 41,
+   "event": "line",
+   "line": 31,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 31,
+     "locals": {
+      "head": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "20 10 30 \n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 42,
+   "event": "line",
+   "line": 36,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 36,
+     "locals": {
+      "head": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "20 10 30 \n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 43,
+   "event": "return",
+   "line": 37,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 37,
+     "locals": {
+      "head": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "20 10 30 \n",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "scalar",
+    "type": "int",
+    "value": 0
+   }
+  }
+ ],
+ "diagnostics": [],
+ "compile_ms": 303.3,
+ "trace_ms": 432.8,
+ "status": "ok",
+ "complete": true,
+ "stdout": "20 10 30 \n",
+ "stderr": "",
+ "exit_code": 0
+}
