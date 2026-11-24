@@ -14,7 +14,7 @@ export function eventMeaning(e: TraceEvent) {
   }
 }
 export const statusMeaning = {
-  ok: 'Run finished normally', error: 'Run ended with a captured exception',
+  ok: 'Run finished normally', error: 'Run ended with an error: an exception, a crash or a compile error',
   timeout: 'Worker timed out. Last checkpoint may lag behind execution',
   trace_limit: 'Capture stopped at an event, object or stack limit',
   output_limit: 'Capture stopped at the output limit', unsupported: 'Program uses an unsupported construct',
