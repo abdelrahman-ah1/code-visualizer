@@ -82,3 +82,40 @@ Browser timings include test automation overhead. These are bounded smoke measur
 - Heap is a text inspector, not the M3 structure canvas. No backend, editor, breakpoints, watch, animation or session export.
 - Existing root README says not to start React until its M1 learning gate. The user's explicit M2 request starts this pack without claiming that local gate was completed. Root docs are preserved.
 - Existing plan.md settles FastAPI while agent.md retains an older open-backend sentence. No backend is part of M2; this pack does not silently revise either document.
+
+# Milestone 4 test report
+
+Environment: Linux x64, one CPU core, Node 22.23.5, Chrome 157.0.8103.78 (headless), Python 3.10.12 in a fresh virtual environment, FastAPI 0.162.5, uvicorn 0.54.0. Run on the final files, Nov 24, 2026. Python 3.12 was not available, so the backend and tracer were not run on 3.12 here.
+
+## Results actually run
+
+| Check | Command | Result |
+|---|---|---|
+| Types | `npx tsc --noEmit` | clean |
+| Build | `npm run build` | ok (JS 264.20 kB, gzip 83.48 kB; session template written) |
+| Unit tests | `npx vitest run` | **88 passed** (66 from M3.5, 22 new: breakpoints 10, watch 11, M4 timings 1) |
+| Chrome UI tests | `npx playwright test` | **38 passed** (22 from M3.5 unchanged and passing, 14 in `m4.spec.ts`, 2 in `performance.spec.ts`) |
+| Python tests with backend installed | `python -m unittest` | **41 passed** (13 M1 + 28 backend API tests) |
+| Python tests without FastAPI | `python3 -m unittest` | 13 M1 tests pass, backend tests skipped with a message |
+| npm audit | not rerun for M4 | no npm package was added or changed |
+
+## What the new tests check
+
+- Backend (real tracer subprocesses): trace equals `capture()` output; stdin; uncaught exception, syntax error with line, timeout with partial events, event limit and unsupported construct all return HTTP 200 with the true status; limits and types give 422; source over 64 KiB in bytes gives 413; oversized body 413; wrong content type 415; foreign Origin 403 and the tracer is not called; foreign Host (including `127.0.0.1.evil.example`) 403; no CORS headers; busy server 429 within the request and the slot is freed afterwards or after a tracer crash; gzip; all 19 examples trace to a documented status.
+- Breakpoints (hand-derived from recorded events): loop body stops at events 3, 5, 7; recursion line with `line` and `return` events stops only on `line`; never-run lines are reported; Play pauses before a breakpoint line and continues to the next; Previous/Next breakpoint; keyboard toggle; breakpoints survive a re-run and are cleared by opening another recording.
+- Watch: parsing accepts only names, fields, indexes and string keys (12 hostile inputs rejected); lookup order current frame then module; list index, negative index, out of range, missing field; linked list with a cycle prints without looping; change detection finds loop changes, in-place list mutation, rebinding to an equal copy, and going out of scope.
+- UI: run, example programs and stdin, honest failures (error, trace_limit, unsupported, syntax error), 429, 500, a wrong-version trace refused, backend unreachable with saved recordings still opening, cancel then late answer ignored, draft survives reload, stale-editor notice, 64 KiB limit, Tab and Esc keys, export of a run then opening it offline with zero network requests and no console errors, desktop dark and light and phone screenshots with no sideways scroll.
+
+## Measured performance
+
+See `PERF_REPORT.md`: backend 268 ms to trace 1,806 events, response built about 12x faster than the framework default, gzip to about 2%, click Run to first frame about 1 s, stepping at the 33 ms frame floor for 1,806 and 10,000 events, long-source seeking improved at 6x slower CPU.
+
+## Limits and checks not run
+
+- Only Chrome was exercised in the browser. Edge and Safari were not tested; Firefox was not retested for M4.
+- Python 3.12, Windows and macOS were not tested. The user's laptop numbers are unknown.
+- The backend is not a sandbox and must not be exposed. Tests do not claim security beyond the local Host/Origin checks.
+- A cancelled run keeps running on the backend until its time limit.
+- The editor has no syntax highlighting or auto-indent. Watches cannot evaluate expressions.
+- The 10,000-event performance recording is synthetic; the tracer itself stops at 2,000 events.
+- The M3.5 plan.md checkbox is still unticked in the repo; this pack does not edit plan.md. When you are happy with M4, tick M4 and M3.5 yourself.
