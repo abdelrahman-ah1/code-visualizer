@@ -1,2 +1,3 @@
 import { defineConfig } from 'vitest/config';
-export default defineConfig({ base: './', test: { include: ['tests/**/*.test.ts'] } });
+import { sessionTemplate } from './session-template.ts';
+export default defineConfig({ base: './', plugins: [sessionTemplate()], test: { include: ['tests/**/*.test.ts'] } });
