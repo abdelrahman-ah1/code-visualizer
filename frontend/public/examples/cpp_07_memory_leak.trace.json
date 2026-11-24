@@ -1,0 +1,179 @@
+{
+ "schema_version": "codeviz.trace/1.0",
+ "runtime": {
+  "implementation": "g++ + gdb",
+  "version": "g++ 11.4.0, gdb 12.1"
+ },
+ "source": "struct Node { int v; Node* next; };\nint main() {\n    Node* n = new Node{1, nullptr};\n    n->v = 2;\n    n = nullptr;\n    return 0;\n}\n",
+ "limits": {
+  "wall_seconds": 5.0,
+  "events": 500,
+  "output_chars": 8192
+ },
+ "events": [
+  {
+   "step": 0,
+   "event": "call",
+   "line": 3,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 3,
+     "locals": {}
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 1,
+   "event": "line",
+   "line": 4,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 4,
+     "locals": {
+      "n": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "v": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 2,
+   "event": "line",
+   "line": 5,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 5,
+     "locals": {
+      "n": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "v": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 3,
+   "event": "line",
+   "line": 6,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 6,
+     "locals": {
+      "n": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 4,
+   "event": "return",
+   "line": 7,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 7,
+     "locals": {
+      "n": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "scalar",
+    "type": "int",
+    "value": 0
+   }
+  }
+ ],
+ "diagnostics": [
+  {
+   "source": "sanitizer",
+   "severity": "warning",
+   "kind": "memory-leak",
+   "message": "Memory leak: 16 bytes in 1 object(s) were never freed",
+   "line": 3
+  }
+ ],
+ "compile_ms": 82.2,
+ "trace_ms": 267.8,
+ "status": "ok",
+ "complete": true,
+ "stdout": "",
+ "stderr": "",
+ "exit_code": 0
+}
