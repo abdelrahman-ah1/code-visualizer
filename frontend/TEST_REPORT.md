@@ -1,3 +1,25 @@
+# M3.5 test report
+
+Checked 24 November 2026 on the M3 base (main at commit 21b0179).
+
+## Results actually run
+
+- `npm ci` clean, `npx tsc --noEmit` clean, `npm run build` passed (JS 247.7 kB / 78.1 kB gzip, CSS 7.1 kB; `dist/session-template.html` about 255 kB).
+- `npm test`: **66 tests passed** (60 earlier plus 6 new in `session.test.ts`).
+- `CHROME_BIN=/usr/bin/google-chrome npm run test:ui`: **22 tests passed** in real headless Chrome (20 earlier plus 2 new). The new ones export from the running app, save the download, open it from `file://` in a separate browser context with `offline: true`, and check: no request other than file/data/blob, no console or page errors, shared view shown, no example menu or export button, Last/Next boundaries, structures panel drawn, no sideways scroll at 390 px in light mode. A hostile-source export (`<img onerror>`, `</script><script>`) sets no globals and renders as text.
+- `npm audit`: 0 vulnerabilities at check time (point in time only).
+- The trace format, the tracer and earlier fixtures were not touched. The Python baseline was not rerun.
+
+## Visual inspection
+
+Looked at the offline-opened session: 1280 px dark (list at final step with tags, arrows, tail pointing back to head, source, stack, heap, output) and 390 px light (readable, structure panel scrolls inside itself). Both showed the share notice and "SHARED SESSION" label. Layout matches the M3 app.
+
+## Not tested
+
+Firefox, Safari, Windows, a real phone, opening the file from email or chat apps (some block or rewrite HTML attachments), very large traces (up to 10,000 events should embed, but file size was only checked with the small examples).
+
+---
+
 # M3 test report
 
 Checked 24 November 2026 on the M2 base (frontend folder from main, commit ef2299e).
