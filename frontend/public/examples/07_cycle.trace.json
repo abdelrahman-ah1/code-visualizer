@@ -1,0 +1,287 @@
+{
+  "schema_version": "codeviz.trace/1.0",
+  "runtime": {
+    "implementation": "cpython",
+    "version": "3.11.9"
+  },
+  "source": "class Node:\n    pass\nnode = Node()\nnode.value = 7\nnode.next = node\n",
+  "limits": {
+    "wall_seconds": 2.0,
+    "events": 500,
+    "output_chars": 8192
+  },
+  "events": [
+    {
+      "step": 0,
+      "event": "call",
+      "line": 0,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 0,
+          "locals": {}
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 1,
+      "event": "line",
+      "line": 1,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 1,
+          "locals": {}
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 2,
+      "event": "call",
+      "line": 1,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 1,
+          "locals": {}
+        },
+        {
+          "depth": 1,
+          "function": "Node",
+          "line": 1,
+          "locals": {}
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 3,
+      "event": "line",
+      "line": 1,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 1,
+          "locals": {}
+        },
+        {
+          "depth": 1,
+          "function": "Node",
+          "line": 1,
+          "locals": {}
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 4,
+      "event": "line",
+      "line": 2,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 1,
+          "locals": {}
+        },
+        {
+          "depth": 1,
+          "function": "Node",
+          "line": 2,
+          "locals": {}
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 5,
+      "event": "return",
+      "line": 2,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 1,
+          "locals": {}
+        },
+        {
+          "depth": 1,
+          "function": "Node",
+          "line": 2,
+          "locals": {}
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": [],
+      "return_value": {
+        "kind": "scalar",
+        "type": "NoneType",
+        "value": null
+      }
+    },
+    {
+      "step": 6,
+      "event": "line",
+      "line": 3,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 3,
+          "locals": {
+            "Node": {
+              "kind": "opaque",
+              "type": "type"
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 7,
+      "event": "line",
+      "line": 4,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 4,
+          "locals": {
+            "Node": {
+              "kind": "opaque",
+              "type": "type"
+            },
+            "node": {
+              "kind": "ref",
+              "id": "o1"
+            }
+          }
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "Node",
+          "fields": {}
+        }
+      },
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 8,
+      "event": "line",
+      "line": 5,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 5,
+          "locals": {
+            "Node": {
+              "kind": "opaque",
+              "type": "type"
+            },
+            "node": {
+              "kind": "ref",
+              "id": "o1"
+            }
+          }
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "Node",
+          "fields": {
+            "value": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 7
+            }
+          }
+        }
+      },
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 9,
+      "event": "return",
+      "line": 5,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 5,
+          "locals": {
+            "Node": {
+              "kind": "opaque",
+              "type": "type"
+            },
+            "node": {
+              "kind": "ref",
+              "id": "o1"
+            }
+          }
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "Node",
+          "fields": {
+            "value": {
+              "kind": "scalar",
+              "type": "int",
+              "value": 7
+            },
+            "next": {
+              "kind": "ref",
+              "id": "o1"
+            }
+          }
+        }
+      },
+      "stdout": "",
+      "stderr": "",
+      "truncated": [],
+      "return_value": {
+        "kind": "scalar",
+        "type": "NoneType",
+        "value": null
+      }
+    }
+  ],
+  "status": "ok",
+  "complete": true,
+  "stdout": "",
+  "stderr": "",
+  "resource_limits_applied": false
+}
