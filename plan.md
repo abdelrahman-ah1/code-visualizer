@@ -4,8 +4,8 @@ An interactive web platform that takes unmodified source code (Python, C++) and 
 
 - Repo: `github.com/abdelrahman-ah1/code-visualizer` (public since Nov 23, 2026)
 - Pace: ~2 hours/day, no deadline
-- Status: Milestones 1 to 3 done (tracer pack, replay interface, structures view; all on `main`). Next: M3.5
-- Updated Nov 24, 2026: M2 and M3 marked done (M3 tested locally, no issues found).
+- Status: Milestones 1 to 4 done (tracer pack, replay interface, structures view, offline export, local backend/editor; all on `main`). Next: M5
+- Updated Nov 24, 2026: M2, M3, M3.5 and M4 marked done after laptop testing.
 - Revised Nov 24, 2026: applied the 9-point review (repo visibility, TypeScript, trace contract reference, softened performance claims, milestone acceptance criteria, updated open questions)
 
 ---
@@ -99,9 +99,9 @@ Estimates are at ~2 hours/day and are planning estimates, not commitments. Each 
   - Done means: known fixture states render correctly (before-line timing, recursion, aliases, cycles); first/last-step boundaries, single-event and empty traces don't crash; backward stepping restores the recorded state and output without re-running code; play/pause and speed changes never skip the final state or stack up timers; malformed or partial traces get clear errors.
 - [x] **M3 — Structures, animation, dark mode** *(done)*: linked list and array rendering first, smooth transitions between steps, clean minimal UI with dark mode.
   - Done means: empty and single-node structures, aliases, cycles, insertion and mutation all render correctly at desktop and phone sizes in both themes, with object positions stable across steps.
-- [ ] **M3.5 — Share: export session** *(after M3)*: export a session (code + trace) as a single file anyone can open and replay in their browser, no server needed. A real share link comes later, once hosting is decided (§8).
+- [x] **M3.5 — Share: export session** *(after M3)*: export a session (code + trace) as a single file anyone can open and replay in their browser, no server needed. A real share link comes later, once hosting is decided (§8).
   - Done means: an exported file opens offline with everything needed for replay, and contains only the session's code, captured values, and output.
-- [ ] **M4 — Local backend, editor, breakpoints, watch** *(~3 weeks)*: FastAPI server, paste-your-code editor, built-in examples, breakpoints, variable watch.
+- [x] **M4 — Local backend, editor, breakpoints, watch** *(~3 weeks)*: FastAPI server, paste-your-code editor, built-in examples, breakpoints, variable watch.
   - Done means: paste code → trace → replay works end to end; breakpoints and watch operate on recorded events; file-based replay still works; API and failure paths are tested.
 - [ ] **M5 — C++ via g++ + gdb** *(~3 weeks, gated)*: compile with debug info, trace with gdb, emit the same trace JSON. Gated on M1–M4 feeling solid.
   - Done means: a narrow, documented C++ subset traces into the same contract, with unsupported behavior reported rather than faked.
@@ -140,4 +140,4 @@ Resolved since the last revision: the C++ backend question — answered in §5 (
 | Nov 23, 2026 | Frontend: React + TypeScript, to satisfy the no-plain-JS requirement |
 | Nov 23, 2026 | `TRACE_FORMAT.md` adopted as the source of truth for the trace contract |
 | Nov 23, 2026 | `agent.md` created as the coding-agent guide; keep it consistent with this plan |
-| Nov 24, 2026 | M2 and M3 marked done; next up is M3.5 (export session) |
+| Nov 24, 2026 | M2, M3, M3.5 and M4 marked done after laptop testing; next up is M5 (C++ via g++ + gdb) |
