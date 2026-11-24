@@ -1,6 +1,6 @@
 # Dependencies
 
-No paid service, API key, telemetry or remote font is required. The application fetches only its own bundled example files. npm installation and the optional browser download need internet.
+No paid service, API key, telemetry or remote font is required. The application fetches only its own bundled example files and, when you click Export, its own build-time session template. Exported session files make no network requests. npm installation and the optional browser download need internet.
 
 Direct dependencies, license metadata checked from the installed npm packages:
 
