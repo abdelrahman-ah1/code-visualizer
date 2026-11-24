@@ -67,3 +67,29 @@ footer { color:var(--muted); font-size:11px; border-top:1px solid var(--line); m
 @media(max-width:1050px) { .workspace { grid-template-columns:1fr 1fr; } .source-panel { grid-column:1 / -1; } .source { max-height:320px; } }
 @media(max-width:600px) { main { padding:20px 14px; } header { align-items:flex-start; flex-direction:column; } .workspace,.output-grid { grid-template-columns:1fr; } .source-panel { grid-column:auto; } .controls { gap:12px; } .timeline { flex-basis:100%; } .example-label { align-items:flex-start; flex-direction:column; } .example-label select { max-width:100%; } .loader { gap:14px; } .run-status { align-items:flex-start; flex-direction:column; } .run-status small { margin-left:0; } .control-buttons button { padding-inline:10px; } .welcome { padding:42px 4px; } }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; animation:none!important; transition:none!important; } }
+
+/* ---- Milestone 3: structures view ---- */
+.sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; list-style:none; }
+.structures { margin-bottom:16px; }
+.structure-scroll { overflow-x:auto; padding-bottom:6px; max-width:100%; }
+.structure-scroll svg { display:block; max-width:none; }
+.vnode { transition:transform .35s ease; }
+.node-box,.cell-box { fill:var(--raised); stroke:var(--line); stroke-width:1.5; }
+.cell-box.omitted { stroke-dasharray:4 3; }
+.node-divider { stroke:var(--line); stroke-width:1.5; }
+.node-main,.cell-value { fill:var(--ink); font:600 15px 'SFMono-Regular',Consolas,monospace; }
+.node-rest { fill:var(--muted); font:10px 'SFMono-Regular',Consolas,monospace; }
+.node-id,.cell-index { fill:var(--muted); font:10px 'SFMono-Regular',Consolas,monospace; }
+.node-null { fill:var(--muted); font-size:16px; }
+.node-dot { fill:var(--accent); }
+.arrow { fill:none; stroke:var(--accent); stroke-width:2; animation:arrow-in .35s ease both; }
+.arrowhead { fill:var(--accent); }
+.tag rect { fill:var(--chosen); stroke:var(--accent); stroke-width:1; }
+.tag text { fill:var(--ink); font:600 11px 'SFMono-Regular',Consolas,monospace; }
+.tag path { fill:var(--accent); }
+.enter { animation:pop .4s ease both; transform-box:fill-box; transform-origin:center; }
+.changed .node-box,.changed .cell-box { animation:flash 1.1s ease-out; }
+@keyframes pop { from { opacity:0; transform:scale(.7); } to { opacity:1; transform:scale(1); } }
+@keyframes flash { 0% { stroke:var(--warn); stroke-width:4; fill:var(--chosen); } 100% { stroke:var(--line); stroke-width:1.5; } }
+@keyframes arrow-in { from { opacity:0; } to { opacity:1; } }
+@media(max-width:600px) { .structures { padding:14px 10px; } }
