@@ -61,6 +61,17 @@ export function parseTrace(raw: string): Trace {
     const e = record(t.error, 'error'); text(e.type, 'error.type');
     if (e.line !== undefined) integer(e.line, 'error.line');
   }
+  if (t.diagnostics !== undefined) {
+    const list = array(t.diagnostics, 'diagnostics');
+    if (list.length > 100) fail('diagnostics', 'more than 100 entries');
+    list.forEach((raw, i) => {
+      const d = record(raw, `diagnostics[${i}]`);
+      text(d.source, `diagnostics[${i}].source`); text(d.kind, `diagnostics[${i}].kind`); text(d.message, `diagnostics[${i}].message`);
+      if (!['error', 'warning', 'info'].includes(String(d.severity))) fail(`diagnostics[${i}]`, 'unknown severity');
+      for (const key of ['line', 'column', 'freed_line', 'allocated_line']) if (d[key] !== undefined) integer(d[key], `diagnostics[${i}].${key}`);
+    });
+  }
+  if (t.exit_code !== undefined && (typeof t.exit_code !== 'number' || !Number.isInteger(t.exit_code))) fail('exit_code', 'expected an integer');
   const events = array(t.events, 'events');
   if (events.length > 10000) fail('events', 'more than the 10,000-event replay limit');
   if (events.length > limits.events) fail('events', 'exceeds declared event budget');
@@ -83,7 +94,9 @@ export function parseTrace(raw: string): Trace {
         pair.forEach((v) => value(v, `${np}.entry`, heap));
       });
       if (n.fields !== undefined) bindings(n.fields, `${np}.fields`, heap);
-      if (['list', 'tuple'].includes(n.type) && (n.items === undefined || n.length === undefined)) fail(np, 'sequence requires items and length');
+      if (['list', 'tuple', 'array', 'std::vector'].includes(n.type) && (n.items === undefined || n.length === undefined)) fail(np, 'sequence requires items and length');
+      optionalBoolean(n, 'freed', np);
+      for (const key of ['storage', 'address', 'element_type']) if (n[key] !== undefined) text(n[key], `${np}.${key}`);
       if (n.type === 'dict' && n.entries === undefined) fail(np, 'dictionary requires entries');
     });
     const frames = array(e.frames, `${p}.frames`);
