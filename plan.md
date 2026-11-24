@@ -4,7 +4,8 @@ An interactive web platform that takes unmodified source code (Python, C++) and 
 
 - Repo: `github.com/abdelrahman-ah1/code-visualizer` (public since Nov 23, 2026)
 - Pace: ~2 hours/day, no deadline
-- Status: Milestone 1 done (Python tracer pack on `main`)
+- Status: Milestones 1 to 3 done (tracer pack, replay interface, structures view; all on `main`). Next: M3.5
+- Updated Nov 24, 2026: M2 and M3 marked done (M3 tested locally, no issues found).
 - Revised Nov 24, 2026: applied the 9-point review (repo visibility, TypeScript, trace contract reference, softened performance claims, milestone acceptance criteria, updated open questions)
 
 ---
@@ -94,9 +95,9 @@ Estimates are at ~2 hours/day and are planning estimates, not commitments. Each 
 
 - [x] **M1 — Prove the trace** *(done)*: Python run captured as JSON, 10 hand-checkable test programs, passing on Python 3.12 and 3.10. Local use only; not a safe public runner.
   - Done means: the tracer, the ten baseline fixtures, and the expected-state tests are preserved and passing.
-- [ ] **M2 — Replay interface** *(~2 weeks)*: React + TypeScript app that loads a trace JSON and replays it — step forward/back, speed control, variable display. No backend yet; traces loaded from files.
+- [x] **M2 — Replay interface** *(done)*: React + TypeScript app that loads a trace JSON and replays it — step forward/back, speed control, variable display. No backend yet; traces loaded from files.
   - Done means: known fixture states render correctly (before-line timing, recursion, aliases, cycles); first/last-step boundaries, single-event and empty traces don't crash; backward stepping restores the recorded state and output without re-running code; play/pause and speed changes never skip the final state or stack up timers; malformed or partial traces get clear errors.
-- [ ] **M3 — Structures, animation, dark mode** *(~2 weeks)*: linked list and array rendering first, smooth transitions between steps, clean minimal UI with dark mode.
+- [x] **M3 — Structures, animation, dark mode** *(done)*: linked list and array rendering first, smooth transitions between steps, clean minimal UI with dark mode.
   - Done means: empty and single-node structures, aliases, cycles, insertion and mutation all render correctly at desktop and phone sizes in both themes, with object positions stable across steps.
 - [ ] **M3.5 — Share: export session** *(after M3)*: export a session (code + trace) as a single file anyone can open and replay in their browser, no server needed. A real share link comes later, once hosting is decided (§8).
   - Done means: an exported file opens offline with everything needed for replay, and contains only the session's code, captured values, and output.
@@ -139,3 +140,4 @@ Resolved since the last revision: the C++ backend question — answered in §5 (
 | Nov 23, 2026 | Frontend: React + TypeScript, to satisfy the no-plain-JS requirement |
 | Nov 23, 2026 | `TRACE_FORMAT.md` adopted as the source of truth for the trace contract |
 | Nov 23, 2026 | `agent.md` created as the coding-agent guide; keep it consistent with this plan |
+| Nov 24, 2026 | M2 and M3 marked done; next up is M3.5 (export session) |
