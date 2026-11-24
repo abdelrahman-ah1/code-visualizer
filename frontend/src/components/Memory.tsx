@@ -1,14 +1,17 @@
 import { memo } from 'react';
 import type { TraceEvent } from '../types';
 import { ValueView } from './ValueView';
-export const Memory = memo(function Memory({ event }: { event: TraceEvent }) {
-  return <><section className="panel"><h2>Call stack <small>{event.frames.length} frames</small></h2>
+export const CallStack = memo(function CallStack({ event }: { event: TraceEvent }) {
+  return <section className="panel"><h2>Call stack <small>{event.frames.length} frames</small></h2>
     <p className="hint">Outermost to current frame (<code>&lt;globals&gt;</code> and <code>&lt;module&gt;</code> are not stack frames). Parent lines are suspended call sites.</p>
     {event.frames.map((frame, i) => <article className="frame" key={frame.depth}>
       <h3>{frame.function} <small>line {frame.line}{i === event.frames.length - 1 ? ' · current' : ' · suspended'}</small></h3>
       {Object.keys(frame.locals).length ? <dl>{Object.entries(frame.locals).map(([name, value]) => <div className="binding" key={name}><dt>{name}</dt><dd><ValueView value={value}/></dd></div>)}</dl> : <p className="hint">No captured locals</p>}
     </article>)}
-  </section><section className="panel"><h2>Heap <small>{Object.keys(event.heap).length} objects</small></h2>
+  </section>;
+});
+export const Heap = memo(function Heap({ event }: { event: TraceEvent }) {
+  return <section className="panel"><h2>Heap <small>{Object.keys(event.heap).length} objects</small></h2>
     <p className="hint">References share a run-local ID. Cycles link back, never expand forever.</p>
     {!Object.keys(event.heap).length && <p className="empty">No reachable captured objects</p>}
     {Object.entries(event.heap).map(([id, node]) => <article className="heap-node" id={`heap-${encodeURIComponent(id)}`} key={id}>
@@ -21,5 +24,8 @@ export const Memory = memo(function Memory({ event }: { event: TraceEvent }) {
       {node.truncated && <p className="warning">Additional data omitted</p>}
     </article>)}
     <p className="hint">Missing later does not prove deallocation. IDs are not memory addresses.</p>
-  </section></>;
+  </section>;
+});
+export const Memory = memo(function Memory({ event }: { event: TraceEvent }) {
+  return <><CallStack event={event}/><Heap event={event}/></>;
 });
