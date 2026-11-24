@@ -12,7 +12,9 @@ test('alias UI, boundaries, backwards, references and keyboard controls', async 
   await expect(page.locator('.event-status')).toContainText('Before this line executes');
   await page.getByRole('button', {name:'Last',exact:true}).click();
   await expect(page.getByRole('button', {name:'Next',exact:true})).toBeDisabled();
+  await page.getByRole('tab', {name:'Call stack'}).click();
   await expect(page.locator('.frame .ref')).toHaveCount(2);
+  await page.getByRole('tab', {name:'Heap'}).click();
   await expect(page.locator('.heap-node')).toHaveCount(1);
   await expect(page.locator('.heap-node .scalar')).toHaveText(['1','2']);
   await page.getByRole('button', {name:'Previous',exact:true}).click();
@@ -65,6 +67,7 @@ test('empty, single snapshot, malformed and partial files', async ({ page }) => 
 test('recursion, cycle, omitted markers and markup remain safe', async ({ page }) => {
   await page.getByLabel('Example trace').selectOption('03_recursion');
   await page.getByLabel('Event timeline').fill('9');
+  await page.getByRole('tab', {name:'Call stack'}).click();
   expect(await page.locator('.frame').count()).toBeGreaterThan(1);
   await page.getByLabel('Example trace').selectOption('07_cycle');
   await page.getByRole('button',{name:'Last',exact:true}).click();
