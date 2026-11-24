@@ -56,3 +56,20 @@ Questions to try: Why does a half of a split list keep the old row? Where is the
 Known limits: only the `next` chain is drawn for lists (a `prev` field shows only in the Heap panel). Types with two self-pointing fields (left/right) are left for the graph and tree milestone. Rows close up when a structure vanishes. Arrows may briefly lag a box that moves in a different row during the slide. IDs are not addresses.
 
 Next small step: try the five new examples, then tell me what you want M3.5 (export a session) to be. Do not start it automatically.
+
+## Milestone 3.5 additions
+
+20. **src/session.ts** (new): small pure helpers, no React. `buildSessionHtml` puts the trace JSON into the template at one marker. `escapeJsonForHtml` rewrites `<`, `>`, `&` and two line-separator characters as `\uXXXX` so source text like `</script>` cannot end the data block (JSON.parse reads it back identically). `readEmbeddedSession` returns the data block's text, or null on a normal page. `sessionFileName` keeps only safe characters. `SHARE_NOTICE` is the one sentence about what a session contains.
+21. **session-template.ts** (new, outside `src`): a Vite plugin that builds the app once more as a single HTML text: JS and CSS inlined, a strict Content-Security-Policy, a marker where the data goes. In `npm run dev` it answers `/session-template.html` on demand; `npm run build` writes the same file into `dist/`. It is build tooling, so it uses no new package.
+22. **vite.config.ts** (changed, 1 line): registers that plugin.
+23. **src/App.tsx** (changed): on start it checks for an embedded session. If found, it validates it with the same `parseTrace`, hides the loader and shows the shared view. Otherwise it behaves as before and adds the Export button, which fetches the template, inserts the already-validated trace, and downloads a Blob. The share notice shows beside the button.
+24. **tests/session.test.ts** (new): escaping, round-trip equality, first-marker-only, hostile text, missing marker, file names.
+25. **tests/session.spec.ts** (new): in real Chrome, exports from the running app, then opens the saved file from disk in a fresh browser with the network switched off, records every request (must be none), replays it, and takes desktop and phone screenshots. A second test exports a trace whose source contains `<img onerror>` and `</script><script>`, and checks nothing runs.
+26. **sample-sessions/12_linked_list_insert.session.html** (new): a real exported file to double-click. It is generated output; re-export it if the app changes.
+27. **package.json**: version 0.3.5 only.
+
+Questions to try: Why is the trace stored in `<script type="application/json">` instead of inside the JavaScript? What would break if `<` were not escaped? Why does the exported file not need the example files? Where is "no network" enforced?
+
+Known limits: the file is about 250 kB because it carries the whole app. It needs a browser that supports ES modules from `file://` (current Chrome, Edge, Firefox, Safari all do; only Chrome was tested here). A session cannot be re-exported from the shared view. The exported app is a snapshot of the app version that made it. Anyone with the file can edit it, so treat a received session like any HTML file: open only files from people you trust, because the script inside it is whatever the sender put there.
+
+Next small step: try export and the offline open, then say if anything is off. M4 (backend and editor) is next in plan.md, not started.
