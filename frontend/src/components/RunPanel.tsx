@@ -70,7 +70,7 @@ export function RunPanel({ source, stdin, language, onSource, onStdin, onLanguag
   }
   function cancel() { runId.current++; controller.current?.abort(); setRunning(false); setMessage('Stopped waiting. The backend run itself ends at its time limit.'); }
 
-  return <section className="panel run-panel" aria-label="Run your code"><div className="run-head"><h2>Write code <small>{LANGUAGE_NAMES[language]} · runs on this computer</small></h2>
+  return <section className={`panel run-panel${collapsed ? ' collapsed' : ''}`} aria-label="Run your code"><div className="run-head"><h2>Write code <small>{LANGUAGE_NAMES[language]} · runs on this computer</small></h2>
     <span className={`backend-badge ${backend.state}`} role="status" data-testid="backend-state">{backend.state === 'online' ? `Backend online${backend.python ? ` · Python ${backend.python}` : ''}` : backend.state === 'checking' ? 'Checking backend...' : 'Backend offline'}</span></div>
     <div className="run-bar">
       <label className="example-label">Language<select aria-label="Language" value={language} onChange={(e) => { onLanguage(e.target.value as Language); setMessage(''); }}><option value="python">Python</option><option value="cpp">C++</option></select></label>
