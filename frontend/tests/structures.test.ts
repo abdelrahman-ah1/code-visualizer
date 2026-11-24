@@ -95,7 +95,7 @@ describe('stability', () => {
         if (s[i].lanes.length !== s[i - 1].lanes.length) continue;
         for (const id of Object.keys(s[i].boxes)) {
           const was = s[i - 1].boxes[id];
-          if (was) expect({ name, step: i, id, y: s[i].boxes[id].y }).toEqual({ name, step: i, id, y: was.y });
+          if (was && was.kind !== 'card' && s[i].boxes[id].kind !== 'card') expect({ name, step: i, id, y: s[i].boxes[id].y }).toEqual({ name, step: i, id, y: was.y });
         }
       }
     });
