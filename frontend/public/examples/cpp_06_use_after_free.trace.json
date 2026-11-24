@@ -1,0 +1,185 @@
+{
+ "schema_version": "codeviz.trace/1.0",
+ "runtime": {
+  "implementation": "g++ + gdb",
+  "version": "g++ 11.4.0, gdb 12.1"
+ },
+ "source": "#include <iostream>\nstruct Node { int v; Node* next; };\nint main() {\n    Node* n = new Node{1, nullptr};\n    delete n;\n    std::cout << n->v << \"\\n\";\n    return 0;\n}\n",
+ "limits": {
+  "wall_seconds": 5.0,
+  "events": 500,
+  "output_chars": 8192
+ },
+ "events": [
+  {
+   "step": 0,
+   "event": "call",
+   "line": 4,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 4,
+     "locals": {}
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 1,
+   "event": "line",
+   "line": 5,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 5,
+     "locals": {
+      "n": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "Node",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "fields": {
+      "v": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      "next": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 2,
+   "event": "line",
+   "line": 6,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 6,
+     "locals": {
+      "n": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "opaque": true,
+     "freed": true,
+     "storage": "heap",
+     "address": "0x55555556aeb0"
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 3,
+   "event": "line",
+   "line": 7,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 7,
+     "locals": {
+      "n": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "opaque": true,
+     "freed": true,
+     "storage": "heap",
+     "address": "0x55555556aeb0"
+    }
+   },
+   "stdout": "1431655786\n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 4,
+   "event": "return",
+   "line": 8,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 8,
+     "locals": {
+      "n": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o2": {
+     "type": "Node",
+     "opaque": true,
+     "freed": true,
+     "storage": "heap",
+     "address": "0x55555556aeb0"
+    }
+   },
+   "stdout": "1431655786\n",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "scalar",
+    "type": "int",
+    "value": 0
+   }
+  }
+ ],
+ "diagnostics": [
+  {
+   "source": "sanitizer",
+   "severity": "error",
+   "kind": "asan-heap-use-after-free",
+   "message": "Memory used after it was freed (read of 4 bytes); freed on line 5, allocated on line 4",
+   "line": 6,
+   "freed_line": 5,
+   "allocated_line": 4
+  }
+ ],
+ "compile_ms": 283.4,
+ "trace_ms": 309.0,
+ "status": "ok",
+ "complete": true,
+ "stdout": "1431655786\n",
+ "stderr": "",
+ "exit_code": 0
+}
