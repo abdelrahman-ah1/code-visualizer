@@ -9,9 +9,24 @@ export const GEOM = { nodeW: 92, nodeH: 56, gap: 52, cell: 46, pad: 28, tagH: 34
 export const LANE_H = GEOM.tagH + GEOM.nodeH + GEOM.belowH;
 const POCKET = 12; // distance from a node's right edge to the centre of its link dot
 
-export interface Box { id: string; kind: 'node' | 'array'; x: number; y: number; w: number; h: number; lane: number }
+export interface Box { id: string; kind: 'node' | 'array' | 'card'; x: number; y: number; w: number; h: number; lane: number }
 // An arrow from one box (and, for arrays, one cell) to another drawn box.
-export interface Link { from: string; cell?: number; to: string }
+export interface Link { from: string; cell?: number; to: string; port?: { x: number; y: number } }
+// General object card: every captured object that is not a list node or array is drawn as a card of rows.
+export const CARD = { w: 138, head: 25, row: 16, pad: 5, gap: 16 };
+export interface CardRow { label: string; value: Value | null; note?: string }
+export function cardRows(n: HeapNode): CardRow[] {
+  const rows: CardRow[] = [];
+  for (const [k, v] of Object.entries(n.fields ?? {})) rows.push({ label: k, value: v });
+  (n.items ?? []).forEach((v, i) => rows.push({ label: `[${i}]`, value: v }));
+  for (const [k, v] of n.entries ?? []) rows.push({ label: fmt(k, 10), value: v });
+  const om = arrayOmitted(n); if (om > 0) rows.push({ label: '…', value: null, note: `${om} more not captured` });
+  if (n.opaque) rows.push({ label: '', value: null, note: 'contents not captured' });
+  if (!rows.length) rows.push({ label: '', value: null, note: 'empty' });
+  return rows;
+}
+export const cardHeight = (n: HeapNode) => CARD.head + cardRows(n).length * CARD.row + CARD.pad;
+export const portY = (row: number) => CARD.head + row * CARD.row + CARD.row / 2;
 export interface SceneLane {
   lane: number; row: number; kind: 'list' | 'array'; ids: string[]; type: string;
   // list only: how the last node ends. 'null' = link is None; 'cycle' = points back into this chain;
@@ -21,7 +36,8 @@ export interface SceneLane {
 export interface Scene {
   lanes: SceneLane[]; boxes: Record<string, Box>; links: Link[];
   tags: Record<string, string[]>;   // heap id -> variable names pointing at it
-  nulls: string[];                  // variables currently None
+  nulls: string[];                  // variables currently null
+  cards: string[];                  // ids drawn as general object cards
   undrawn: { id: string; type: string }[]; // heap objects this view does not draw (see the Heap panel)
   width: number; height: number;
 }
@@ -122,7 +138,23 @@ export function buildScene(event: TraceEvent, state: LayoutState): Scene {
     }
   });
 
+  const lanesH = Math.max(1, occupied.length) * LANE_H + 12;
+  const cardIds = ids.filter((id) => !boxes[id]).sort((a, b) => rank(a) - rank(b));
+  const wrapW = Math.max(width, 1000);
+  let cx = GEOM.pad, cy = (occupied.length ? lanesH : 0) + GEOM.tagH, rowH = 0, totalH = lanesH;
+  for (const id of cardIds) {
+    const h = cardHeight(heap[id]);
+    if (cx > GEOM.pad && cx + CARD.w > wrapW) { cx = GEOM.pad; cy += rowH + CARD.gap + GEOM.tagH - 8; rowH = 0; }
+    boxes[id] = { id, kind: 'card', x: cx, y: cy, w: CARD.w, h, lane: -1 };
+    cx += CARD.w + CARD.gap; rowH = Math.max(rowH, h); width = Math.max(width, cx - CARD.gap + GEOM.pad); totalH = cy + rowH + GEOM.belowH / 2;
+  }
   const links: Link[] = [];
+  // Pointer fields on list nodes other than the chain link (prev, parent, owner ...).
+  for (const id of listNodes) {
+    const f = field(id);
+    Object.entries(heap[id].fields ?? {}).forEach(([k, v]) => { if (k !== f && v.kind === 'ref' && boxes[v.id]) links.push({ from: id, to: v.id, port: { x: GEOM.nodeW / 2, y: GEOM.nodeH } }); });
+  }
+  cardIds.forEach((id) => cardRows(heap[id]).forEach((r, i) => { if (r.value?.kind === 'ref' && boxes[r.value.id]) links.push({ from: id, cell: i, to: r.value.id, port: { x: CARD.w - 10, y: portY(i) } }); }));
   for (const id of listNodes) { const s = succ(id); if (s !== null && boxes[id] && boxes[s]) links.push({ from: id, to: s }); }
   for (const id of ids) {
     const n = heap[id];
@@ -136,8 +168,8 @@ export function buildScene(event: TraceEvent, state: LayoutState): Scene {
     if (v.kind === 'ref' && boxes[v.id]) (tags[v.id] ??= []).push(label);
     else if (v.kind === 'scalar' && v.value === null && !nulls.includes(label)) nulls.push(label);
   }
-  const undrawn = ids.filter((id) => !boxes[id]).map((id) => ({ id, type: heap[id].type }));
-  return { lanes, boxes, links, tags, nulls, undrawn, width, height: Math.max(1, occupied.length) * LANE_H + 12 };
+  const undrawn: { id: string; type: string }[] = []; // every captured object now has a box
+  return { lanes, boxes, links, tags, nulls, cards: cardIds, undrawn, width, height: totalH };
 }
 
 // All scenes for a trace, built once in order so lane choices carry forward. Stepping backward just indexes this array.
@@ -172,6 +204,15 @@ export const cellCentre = (cell: number) => cell * GEOM.cell + GEOM.cell / 2;
 export function linkPath(link: Link, boxes: Record<string, Box>): string | null {
   const a = boxes[link.from], b = boxes[link.to];
   if (!a || !b) return null;
+  if (a.kind === 'card' || b.kind === 'card' || link.port) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const sx = link.port ? link.port.x : a.kind === 'array' ? cellCentre(link.cell ?? 0) : a.w - POCKET, sy = link.port ? link.port.y : a.kind === 'array' ? a.h + 20 : a.h;
+    if (link.from === link.to) return `M ${sx} ${sy} C ${sx + 40} ${sy - 10}, ${sx + 40} ${sy + 20}, ${sx + 2} ${sy + 4}`;
+    const tx = dx + b.w / 2, ty = dy - 3;
+    const right = a.kind === 'card' && link.port && dx > a.w; // target is clear of the card on the right: go side to side
+    if (right) return `M ${sx} ${sy} C ${sx + 40} ${sy}, ${dx - 40} ${dy + b.h / 2}, ${dx - 3} ${dy + b.h / 2}`;
+    return `M ${sx} ${sy} C ${sx + 50} ${sy + 20}, ${tx} ${ty - 60}, ${tx} ${ty}`;
+  }
   const dx = b.x - a.x, dy = b.y - a.y;
   const start = a.kind === 'node' ? { x: a.w - POCKET, y: a.h / 2 } : { x: cellCentre(link.cell ?? 0), y: a.h + 20 };
   // Straight arrow: next node sits directly to the right in the same row.
