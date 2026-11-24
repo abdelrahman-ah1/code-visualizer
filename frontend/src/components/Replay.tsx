@@ -5,14 +5,18 @@ import { eventMeaning, outputAt, statusMeaning } from '../replay';
 import { Controls } from './Controls';
 import { Source } from './Source';
 import { Memory } from './Memory';
+import { Structures } from './Structures';
+import { buildScenes } from '../structures';
 import { ValueView } from './ValueView';
 export function Replay({ trace }: { trace: Trace }) {
   const p = usePlayback(trace.events.length), event = trace.events[p.index];
+  const scenes = useMemo(() => buildScenes(trace), [trace]);
   const lines = useMemo(() => trace.source.split('\n'), [trace.source]);
   const atEnd = !trace.events.length || p.index === trace.events.length - 1;
   return <><div className={`run-status ${trace.status === 'ok' ? '' : 'warning'}`}><b>Recorded run: {trace.status}</b><span>{statusMeaning[trace.status]}. {trace.complete ? 'Final record captured.' : 'Incomplete capture.'}</span><small>{trace.runtime.implementation} {trace.runtime.version}{trace.error ? ` · ${trace.error.type}${trace.error.line ? ` on line ${trace.error.line}` : ''}` : ''}</small></div>
     <Controls playback={p} count={trace.events.length}/>
     <div className="event-status" role="status">{event ? <><b>{event.event} · step {event.step} · line {event.line}</b><span>{eventMeaning(event)}</span>{event.exception_type && <span className="warning">{event.exception_type}</span>}{event.return_value && <span>Recorded return value: <ValueView value={event.return_value}/></span>}{event.truncated.length > 0 && <span className="warning">Snapshot omissions: {event.truncated.join(', ')}</span>}</> : <b>No snapshots captured. The run status and final output still apply.</b>}</div>
+    {event && <Structures scene={scenes[p.index]} event={event} prev={trace.events[p.index - 1]} prevScene={scenes[p.index - 1]}/>}
     <div className="workspace"><Source lines={lines} line={event?.line}/>{event && <Memory event={event}/>}</div>
     <section className="panel output"><h2>Captured output <small>{atEnd ? 'final record, if available' : 'at this snapshot'}</small></h2>
       {(trace.stdout === undefined || trace.stderr === undefined) && <p className="warning">Final output is missing. At the end, the last checkpoint is shown and may lag.</p>}
