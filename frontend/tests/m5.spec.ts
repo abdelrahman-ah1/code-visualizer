@@ -4,6 +4,7 @@ import type { Page } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 const SHOTS = process.env.SHOTS_DIR || 'test-results/screens';
 mkdirSync(SHOTS, { recursive: true });
+const openEditor = async (page: Page) => { const b = page.getByRole('button', { name: 'Edit code' }); if (await b.isVisible()) await b.click(); };
 const run = (page: Page) => page.getByRole('button', { name: 'Run and record' });
 test.beforeEach(async ({ page }) => { page.setViewportSize({ width: 1440, height: 1500 }); await page.goto('/'); await expect(page.getByTestId('backend-state')).toContainText('Backend online'); });
 async function runExample(page: Page, n: number) {
@@ -39,7 +40,7 @@ test('use after free shows a freed node', async ({ page }) => {
 });
 test('compile error is reported, then a good program runs again', async ({ page }) => {
   await page.getByLabel('Language').selectOption('cpp');
-  await page.getByLabel('C++ source code').fill('int main() {\n  int x = ;\n  return 0;\n}\n');
+  await openEditor(page); await page.getByLabel('C++ source code').fill('int main() {\n  int x = ;\n  return 0;\n}\n');
   await run(page).click();
   await expect(page.locator('.diagnostics')).toBeVisible({ timeout: 20000 });
   await page.screenshot({ path: `${SHOTS}/m5-compile-error.png`, fullPage: true });
@@ -49,7 +50,7 @@ test('compile error is reported, then a good program runs again', async ({ page 
 });
 test('infinite loop times out and the next run still works', async ({ page }) => {
   await page.getByLabel('Language').selectOption('cpp');
-  await page.getByLabel('C++ source code').fill('int main() {\n  int i = 0;\n  while (true) {\n    i++;\n  }\n}\n');
+  await openEditor(page); await page.getByLabel('C++ source code').fill('int main() {\n  int i = 0;\n  while (true) {\n    i++;\n  }\n}\n');
   await run(page).click();
   await expect(page.locator('.run-status')).toContainText('timeout', { timeout: 20000 });
   await page.getByLabel('Example program').selectOption({ index: 1 });
