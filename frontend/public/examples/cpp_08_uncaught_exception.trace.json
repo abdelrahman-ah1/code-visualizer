@@ -1,0 +1,265 @@
+{
+ "schema_version": "codeviz.trace/1.0",
+ "runtime": {
+  "implementation": "g++ + gdb",
+  "version": "g++ 11.4.0, gdb 12.1"
+ },
+ "source": "#include <stdexcept>\nint check(int x) {\n    if (x > 2) throw std::out_of_range(\"too big\");\n    return x;\n}\nint main() {\n    int a = check(1);\n    int b = check(5);\n    return a + b;\n}\n",
+ "limits": {
+  "wall_seconds": 5.0,
+  "events": 500,
+  "output_chars": 8192
+ },
+ "events": [
+  {
+   "step": 0,
+   "event": "call",
+   "line": 7,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 7,
+     "locals": {}
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 1,
+   "event": "call",
+   "line": 3,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 7,
+     "locals": {
+      "a": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "check",
+     "line": 3,
+     "locals": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 2,
+   "event": "line",
+   "line": 4,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 7,
+     "locals": {
+      "a": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "check",
+     "line": 4,
+     "locals": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 3,
+   "event": "return",
+   "line": 5,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 7,
+     "locals": {
+      "a": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "check",
+     "line": 5,
+     "locals": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "scalar",
+    "type": "int",
+    "value": 1
+   }
+  },
+  {
+   "step": 4,
+   "event": "line",
+   "line": 8,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 8,
+     "locals": {
+      "a": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 5,
+   "event": "call",
+   "line": 3,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 8,
+     "locals": {
+      "a": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      "b": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "check",
+     "line": 3,
+     "locals": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 6,
+   "event": "exception",
+   "line": 3,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 8,
+     "locals": {
+      "a": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      "b": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "check",
+     "line": 3,
+     "locals": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": [],
+   "exception_type": "std::out_of_range"
+  }
+ ],
+ "diagnostics": [
+  {
+   "source": "runtime",
+   "severity": "error",
+   "kind": "signal-SIGABRT",
+   "message": "The program ended with an uncaught C++ exception (std::out_of_range).",
+   "line": 3
+  }
+ ],
+ "compile_ms": 222.7,
+ "trace_ms": 327.5,
+ "status": "error",
+ "complete": true,
+ "stdout": "",
+ "stderr": "terminate called after throwing an instance of 'std::out_of_range'\n  what():  too big\n",
+ "error": {
+  "type": "std::out_of_range",
+  "line": 3
+ }
+}
