@@ -6,10 +6,10 @@ const SHOTS = process.env.SHOTS_DIR || 'test-results/screens';
 mkdirSync(SHOTS, { recursive: true });
 
 const LOOP = 'total = 0\nfor i in range(3):\n    total += i\n';   // same program as fixture 02_loop
-const editor = (page: Page) => page.getByLabel('Python source code');
+const ed = async (page: Page) => { const b = page.getByRole('button', { name: 'Edit code' }); if (await b.isVisible()) await b.click(); return page.getByLabel('Python source code'); };   // the editor folds away after a run
 const run = (page: Page) => page.getByRole('button', { name: 'Run and record' });
 async function runCode(page: Page, code: string) {
-  await editor(page).fill(code);
+  await (await ed(page)).fill(code);
   await run(page).click();
   await expect(page.getByText(/Event 1 of \d+/)).toBeVisible();
 }
@@ -21,6 +21,7 @@ test('paste code, run, replay: alias program shows one shared list', async ({ pa
   await page.getByRole('button', { name: 'Last', exact: true }).click();
   await expect(page.locator('.heap-node')).toHaveCount(1);
   await expect(page.locator('.heap-node .scalar')).toHaveText(['1', '2']);
+  await page.getByRole('tab', { name: 'Call stack' }).click();
   await expect(page.locator('.frame .ref')).toHaveCount(2);
   await expect(page.locator('.source-panel')).toContainText('b.append(2)');
   await expect(page.getByTestId('run-info')).toContainText('on the backend');
@@ -29,24 +30,24 @@ test('paste code, run, replay: alias program shows one shared list', async ({ pa
 
 test('built-in examples load into the editor and run, including input', async ({ page }) => {
   await page.getByLabel('Example program').selectOption('08_stdout_input');
-  await expect(editor(page)).toHaveValue(/input\(\)/);
+  await expect((await ed(page))).toHaveValue(/input\(\)/);
   await run(page).click();
   await expect(page.getByText(/Event 1 of \d+/)).toBeVisible();
   await page.getByRole('button', { name: 'Last', exact: true }).click();
   await expect(page.getByTestId('stdout')).toContainText('Hello Ada');
   await page.getByLabel('Example program').selectOption('16_bubble_sort');
-  await expect(editor(page)).toHaveValue(/data\[j\]/);
+  await expect((await ed(page))).toHaveValue(/data\[j\]/);
 });
 
 test('failed runs are shown honestly, never as success', async ({ page }) => {
-  await editor(page).fill('x = 1\nraise ValueError("no")\n'); await run(page).click();
+  await (await ed(page)).fill('x = 1\nraise ValueError("no")\n'); await run(page).click();
   await expect(page.locator('.run-status')).toContainText('Recorded run: error');
   await expect(page.locator('.run-status')).toContainText('ValueError');
-  await editor(page).fill('i = 0\nwhile True:\n    i = i + 1\n'); await run(page).click();
+  await (await ed(page)).fill('i = 0\nwhile True:\n    i = i + 1\n'); await run(page).click();
   await expect(page.locator('.run-status b')).toHaveText('Recorded run: trace_limit');
-  await editor(page).fill('def g():\n    yield 1\n'); await run(page).click();
+  await (await ed(page)).fill('def g():\n    yield 1\n'); await run(page).click();
   await expect(page.locator('.run-status b')).toHaveText('Recorded run: unsupported');
-  await editor(page).fill('x = 1\nif x\n'); await run(page).click();
+  await (await ed(page)).fill('x = 1\nif x\n'); await run(page).click();
   await expect(page.locator('.run-status')).toContainText('SyntaxError on line 2');
 });
 
@@ -84,7 +85,7 @@ test('a breakpoint on a line that never runs is reported', async ({ page }) => {
 test('breakpoints survive a re-run of edited code but not loading a different recording', async ({ page }) => {
   await runCode(page, LOOP);
   await page.getByRole('button', { name: 'Breakpoint on line 2' }).click();
-  await editor(page).fill(LOOP + 'print(total)\n'); await run(page).click();
+  await (await ed(page)).fill(LOOP + 'print(total)\n'); await run(page).click();
   await expect(page.locator('.source-panel')).toContainText('print(total)');   // the new run has landed
   await expect(page.getByRole('button', { name: 'Breakpoint on line 2' })).toHaveAttribute('aria-pressed', 'true');
   await page.getByLabel('Example trace').selectOption('05_alias');
@@ -93,6 +94,7 @@ test('breakpoints survive a re-run of edited code but not loading a different re
 
 test('variable watch follows values and jumps between changes', async ({ page }) => {
   await runCode(page, LOOP);
+  await page.getByRole('tab', { name: 'Watch' }).click();
   await page.getByLabel('Watch expression').fill('total'); await page.getByRole('button', { name: 'Add watch' }).click();
   await expect(page.getByTestId('watch-value')).toContainText('not in scope');
   await page.getByRole('button', { name: 'Next change of total' }).click();
@@ -114,6 +116,7 @@ test('variable watch follows values and jumps between changes', async ({ page })
 test('watch handles objects, list items and bad input without evaluating anything', async ({ page }) => {
   await runCode(page, 'items = [10, 20]\nitems.append(30)\nitems[0] = 99\n');
   await page.getByRole('button', { name: 'Last', exact: true }).click();
+  await page.getByRole('tab', { name: 'Watch' }).click();
   for (const text of ['items', 'items[0]', 'items[-1]', 'items[9]']) { await page.getByLabel('Watch expression').fill(text); await page.getByRole('button', { name: 'Add watch' }).click(); }
   await expect(page.getByTestId('watch-value')).toHaveText(['[99, 20, 30]', '99', '30', 'index out of range']);
   await page.getByLabel('Watch expression').fill('__import__("os").getcwd()'); await page.getByRole('button', { name: 'Add watch' }).click();
@@ -124,7 +127,7 @@ test('watch handles objects, list items and bad input without evaluating anythin
 });
 
 test('backend problems: busy, rejected request, server error, and offline', async ({ page }) => {
-  await editor(page).fill('x = 1\n');
+  await (await ed(page)).fill('x = 1\n');
   await page.route('**/api/trace', (route) => route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: { code: 'busy', message: '2 runs are already in progress. Try again in a moment.' } }) }));
   await run(page).click();
   await expect(page.getByTestId('run-error')).toContainText('2 runs are already in progress');
@@ -151,6 +154,7 @@ test('with the backend down, saved recordings still open and replay', async ({ p
   await expect(page.getByLabel('Example program')).toBeDisabled();
   await page.getByLabel('Example trace').selectOption('03_recursion');
   await page.getByRole('button', { name: 'Last', exact: true }).click();
+  await page.getByRole('tab', { name: 'Call stack' }).click();
   await expect(page.locator('.frame')).toHaveCount(1);
   await page.screenshot({ path: `${SHOTS}/m4-backend-offline.png`, fullPage: true });
 });
@@ -158,10 +162,10 @@ test('with the backend down, saved recordings still open and replay', async ({ p
 test('stale notice, cancel, and draft persistence', async ({ page }) => {
   await runCode(page, LOOP);
   await expect(page.getByTestId('stale-note')).toHaveCount(0);
-  await editor(page).fill(LOOP + '# changed\n');
+  await (await ed(page)).fill(LOOP + '# changed\n');
   await expect(page.getByTestId('stale-note')).toBeVisible();
   await page.waitForTimeout(600); await page.reload();
-  await expect(editor(page)).toHaveValue(LOOP + '# changed\n');
+  await expect((await ed(page))).toHaveValue(LOOP + '# changed\n');
   // Cancel: hold the response, press Cancel, then the late response must not replace anything.
   let release: () => void = () => {}; const gate = new Promise<void>((r) => { release = r; });
   await page.route('**/api/trace', async (route) => { await gate; await route.continue(); });
@@ -174,12 +178,12 @@ test('stale notice, cancel, and draft persistence', async ({ page }) => {
 });
 
 test('oversized source cannot be run, and the editor tab key indents', async ({ page }) => {
-  await editor(page).fill('# ' + 'x'.repeat(70000));
+  await (await ed(page)).fill('# ' + 'x'.repeat(70000));
   await expect(run(page)).toBeDisabled();
-  await editor(page).fill('if True:\n'); await editor(page).press('End'); await editor(page).press('Control+End'); await editor(page).press('Tab');
-  await expect(editor(page)).toHaveValue('if True:\n    ');
-  await editor(page).press('Escape'); await editor(page).press('Tab');
-  await expect(editor(page)).not.toBeFocused();
+  await (await ed(page)).fill('if True:\n'); await (await ed(page)).press('End'); await (await ed(page)).press('Control+End'); await (await ed(page)).press('Tab');
+  await expect((await ed(page))).toHaveValue('if True:\n    ');
+  await (await ed(page)).press('Escape'); await (await ed(page)).press('Tab');
+  await expect((await ed(page))).not.toBeFocused();
 });
 
 test('export a run as a session; the offline file replays with breakpoints and watch, no network', async ({ page, browser }) => {
@@ -195,6 +199,7 @@ test('export a run as a session; the offline file replays with breakpoints and w
   await p.getByRole('button', { name: 'Breakpoint on line 3' }).click();
   await p.getByRole('button', { name: 'Next breakpoint' }).click();
   await expect(p.getByText('Event 4 of 10', { exact: true })).toBeVisible();
+  await p.getByRole('tab', { name: 'Watch' }).click();
   await p.getByLabel('Watch expression').fill('total'); await p.getByRole('button', { name: 'Add watch' }).click();
   await expect(p.getByTestId('watch-value')).toHaveText('0');
   expect(bad).toEqual([]); expect(errors).toEqual([]);
@@ -206,6 +211,7 @@ test('screenshots: editor, run result, breakpoint and watch, desktop dark/light 
   await page.getByLabel('Example program').selectOption('17_reverse_linked_list');
   await run(page).click(); await expect(page.getByText(/Event 1 of \d+/)).toBeVisible();
   await page.getByRole('button', { name: 'Breakpoint on line 10' }).click();
+  await page.getByRole('tab', { name: 'Watch' }).click();
   await page.getByLabel('Watch expression').fill('cur.value'); await page.getByRole('button', { name: 'Add watch' }).click();
   await page.getByLabel('Watch expression').fill('prev'); await page.getByRole('button', { name: 'Add watch' }).click();
   await page.getByRole('button', { name: 'Next breakpoint' }).click(); await page.getByRole('button', { name: 'Next breakpoint' }).click();
