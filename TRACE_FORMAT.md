@@ -86,3 +86,8 @@ Defaults: 500 events, 8,192 output characters per stream, 2-second wall timeout.
 On POSIX systems the launcher kills the worker process group at completion or timeout. Windows kills only the worker process; descendant cleanup is not implemented or tested. Never allow child-process programs under this prototype.
 
 Schema evolution: new meanings for existing fields require a new major version. Additive optional metadata can use a minor version after reader compatibility is tested.
+
+## Milestone 5 additions (optional, additive; version stays codeviz.trace/1.0)
+See CPP_LIMITS.md. Top level: `diagnostics` (array of {source, severity, kind, line?, message}), `exit_code`, `compile_ms`, `trace_ms`.
+Heap nodes: `storage` ("stack"|"heap"|"global"), `address`, `freed` (bool, observed free), `element_type`; node types `array`, `std::vector`.
+Frame named `<globals>` holds C++ globals. Readers that ignore unknown fields keep working.
