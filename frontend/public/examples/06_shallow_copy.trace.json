@@ -1,0 +1,352 @@
+{
+  "schema_version": "codeviz.trace/1.0",
+  "runtime": {
+    "implementation": "cpython",
+    "version": "3.11.9"
+  },
+  "source": "inner = [1]\na = [inner]\nb = a[:]\nb[0].append(2)\nb.append([9])\n",
+  "limits": {
+    "wall_seconds": 2.0,
+    "events": 500,
+    "output_chars": 8192
+  },
+  "events": [
+    {
+      "step": 0,
+      "event": "call",
+      "line": 0,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 0,
+          "locals": {}
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 1,
+      "event": "line",
+      "line": 1,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 1,
+          "locals": {}
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 2,
+      "event": "line",
+      "line": 2,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 2,
+          "locals": {
+            "inner": {
+              "kind": "ref",
+              "id": "o1"
+            }
+          }
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "list",
+          "items": [
+            {
+              "kind": "scalar",
+              "type": "int",
+              "value": 1
+            }
+          ],
+          "length": 1
+        }
+      },
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 3,
+      "event": "line",
+      "line": 3,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 3,
+          "locals": {
+            "inner": {
+              "kind": "ref",
+              "id": "o1"
+            },
+            "a": {
+              "kind": "ref",
+              "id": "o2"
+            }
+          }
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "list",
+          "items": [
+            {
+              "kind": "scalar",
+              "type": "int",
+              "value": 1
+            }
+          ],
+          "length": 1
+        },
+        "o2": {
+          "type": "list",
+          "items": [
+            {
+              "kind": "ref",
+              "id": "o1"
+            }
+          ],
+          "length": 1
+        }
+      },
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 4,
+      "event": "line",
+      "line": 4,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 4,
+          "locals": {
+            "inner": {
+              "kind": "ref",
+              "id": "o1"
+            },
+            "a": {
+              "kind": "ref",
+              "id": "o2"
+            },
+            "b": {
+              "kind": "ref",
+              "id": "o3"
+            }
+          }
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "list",
+          "items": [
+            {
+              "kind": "scalar",
+              "type": "int",
+              "value": 1
+            }
+          ],
+          "length": 1
+        },
+        "o2": {
+          "type": "list",
+          "items": [
+            {
+              "kind": "ref",
+              "id": "o1"
+            }
+          ],
+          "length": 1
+        },
+        "o3": {
+          "type": "list",
+          "items": [
+            {
+              "kind": "ref",
+              "id": "o1"
+            }
+          ],
+          "length": 1
+        }
+      },
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 5,
+      "event": "line",
+      "line": 5,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 5,
+          "locals": {
+            "inner": {
+              "kind": "ref",
+              "id": "o1"
+            },
+            "a": {
+              "kind": "ref",
+              "id": "o2"
+            },
+            "b": {
+              "kind": "ref",
+              "id": "o3"
+            }
+          }
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "list",
+          "items": [
+            {
+              "kind": "scalar",
+              "type": "int",
+              "value": 1
+            },
+            {
+              "kind": "scalar",
+              "type": "int",
+              "value": 2
+            }
+          ],
+          "length": 2
+        },
+        "o2": {
+          "type": "list",
+          "items": [
+            {
+              "kind": "ref",
+              "id": "o1"
+            }
+          ],
+          "length": 1
+        },
+        "o3": {
+          "type": "list",
+          "items": [
+            {
+              "kind": "ref",
+              "id": "o1"
+            }
+          ],
+          "length": 1
+        }
+      },
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 6,
+      "event": "return",
+      "line": 5,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 5,
+          "locals": {
+            "inner": {
+              "kind": "ref",
+              "id": "o1"
+            },
+            "a": {
+              "kind": "ref",
+              "id": "o2"
+            },
+            "b": {
+              "kind": "ref",
+              "id": "o3"
+            }
+          }
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "list",
+          "items": [
+            {
+              "kind": "scalar",
+              "type": "int",
+              "value": 1
+            },
+            {
+              "kind": "scalar",
+              "type": "int",
+              "value": 2
+            }
+          ],
+          "length": 2
+        },
+        "o2": {
+          "type": "list",
+          "items": [
+            {
+              "kind": "ref",
+              "id": "o1"
+            }
+          ],
+          "length": 1
+        },
+        "o3": {
+          "type": "list",
+          "items": [
+            {
+              "kind": "ref",
+              "id": "o1"
+            },
+            {
+              "kind": "ref",
+              "id": "o4"
+            }
+          ],
+          "length": 2
+        },
+        "o4": {
+          "type": "list",
+          "items": [
+            {
+              "kind": "scalar",
+              "type": "int",
+              "value": 9
+            }
+          ],
+          "length": 1
+        }
+      },
+      "stdout": "",
+      "stderr": "",
+      "truncated": [],
+      "return_value": {
+        "kind": "scalar",
+        "type": "NoneType",
+        "value": null
+      }
+    }
+  ],
+  "status": "ok",
+  "complete": true,
+  "stdout": "",
+  "stderr": "",
+  "resource_limits_applied": false
+}
