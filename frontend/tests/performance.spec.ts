@@ -38,7 +38,7 @@ test('breakpoint lookup and watch signatures stay fast on a 10,000 event recordi
   await page.getByRole('button', { name: 'Next breakpoint' }).click();
   await expect(page.getByText('Event 2 of 10000', { exact: true })).toBeVisible();
   const jumpMs = Date.now() - t1, t2 = Date.now();
-  await page.getByLabel('Watch expression').fill('a'); await page.getByRole('button', { name: 'Add watch' }).click();
+  await page.getByRole('tab', { name: 'Watch' }).click(); await page.getByLabel('Watch expression').fill('a'); await page.getByRole('button', { name: 'Add watch' }).click();
   await expect(page.getByTestId('watch-value')).toBeVisible();
   const watchMs = Date.now() - t2;
   console.log(JSON.stringify({ events: 10000, stops: 3333, nextBreakpointAndAssertMs: jumpMs, addWatchAndAssertMs: watchMs }));
