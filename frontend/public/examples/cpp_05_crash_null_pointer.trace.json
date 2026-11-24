@@ -1,0 +1,139 @@
+{
+ "schema_version": "codeviz.trace/1.0",
+ "runtime": {
+  "implementation": "g++ + gdb",
+  "version": "g++ 11.4.0, gdb 12.1"
+ },
+ "source": "struct Node { int v; Node* next; };\nint main() {\n    Node* n = nullptr;\n    int x = 5;\n    x = n->v;\n    return x;\n}\n",
+ "limits": {
+  "wall_seconds": 5.0,
+  "events": 500,
+  "output_chars": 8192
+ },
+ "events": [
+  {
+   "step": 0,
+   "event": "call",
+   "line": 3,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 3,
+     "locals": {}
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 1,
+   "event": "line",
+   "line": 4,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 4,
+     "locals": {
+      "n": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 2,
+   "event": "line",
+   "line": 5,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 5,
+     "locals": {
+      "n": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      },
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 3,
+   "event": "exception",
+   "line": 5,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "main",
+     "line": 5,
+     "locals": {
+      "n": {
+       "kind": "scalar",
+       "type": "Node *",
+       "value": null
+      },
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      }
+     }
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": [],
+   "exception_type": "SIGSEGV"
+  }
+ ],
+ "diagnostics": [
+  {
+   "source": "sanitizer",
+   "severity": "error",
+   "kind": "undefined-behavior",
+   "message": "Undefined behavior: member access within null pointer of type 'struct Node'",
+   "line": 5,
+   "column": 7
+  },
+  {
+   "source": "runtime",
+   "severity": "error",
+   "kind": "signal-SIGSEGV",
+   "message": "The program crashed with a segmentation fault (invalid memory access).",
+   "line": 5
+  }
+ ],
+ "compile_ms": 62.4,
+ "trace_ms": 187.6,
+ "status": "error",
+ "complete": true,
+ "stdout": "",
+ "stderr": "",
+ "error": {
+  "type": "SIGSEGV",
+  "line": 5
+ }
+}
