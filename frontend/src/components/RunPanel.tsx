@@ -21,7 +21,7 @@ function serverTime(header: string | null): number | null {
 }
 const bytesOf = (s: string) => new TextEncoder().encode(s).length;
 
-export function RunPanel({ source, stdin, language, onSource, onStdin, onLanguage, onResult }: { source: string; stdin: string; language: Language; onSource: (s: string) => void; onStdin: (s: string) => void; onLanguage: (l: Language) => void; onResult: (raw: string, info: RunInfo) => void }) {
+export function RunPanel({ source, stdin, language, onSource, onStdin, onLanguage, onResult, collapsed = false, onToggleCollapsed }: { collapsed?: boolean; onToggleCollapsed?: () => void; source: string; stdin: string; language: Language; onSource: (s: string) => void; onStdin: (s: string) => void; onLanguage: (l: Language) => void; onResult: (raw: string, info: RunInfo) => void }) {
   const [backend, setBackend] = useState<Backend>({ state: 'checking' });
   const [examples, setExamples] = useState<ExampleProgram[]>([]);
   const [events, setEvents] = useState(500), [timeout, setTimeoutSeconds] = useState(2);
@@ -78,12 +78,13 @@ export function RunPanel({ source, stdin, language, onSource, onStdin, onLanguag
       <label className="example-label">Event limit<select aria-label="Event limit" value={events} onChange={(e) => setEvents(Number(e.target.value))}>{EVENT_CHOICES.map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
       <label className="example-label">Time limit<select aria-label="Time limit" value={timeout} onChange={(e) => setTimeoutSeconds(Number(e.target.value))}>{TIMEOUT_CHOICES.map((n) => <option key={n} value={n}>{n} s</option>)}</select></label>
     </div>
-    <CodeEditor value={source} onChange={onSource} onRun={() => void run()} label={`${LANGUAGE_NAMES[language]} source code`}/>
-    <details className="stdin"><summary>Program input (stdin){stdin ? ' · set' : ''}</summary><textarea aria-label="Program input" value={stdin} maxLength={8192} rows={2} onChange={(e) => onStdin(e.target.value)} spellCheck={false}/></details>
+    {!collapsed && <CodeEditor value={source} onChange={onSource} onRun={() => void run()} label={`${LANGUAGE_NAMES[language]} source code`}/>}
+    {!collapsed && <details className="stdin"><summary>Program input (stdin){stdin ? ' · set' : ''}</summary><textarea aria-label="Program input" value={stdin} maxLength={8192} rows={2} onChange={(e) => onStdin(e.target.value)} spellCheck={false}/></details>}
     <div className="run-actions">{running ? <button type="button" onClick={cancel}>Cancel</button> : <button type="button" className="primary" onClick={() => void run()} disabled={tooBig || !source.trim() || cppMissing}>Run and record</button>}
+      {onToggleCollapsed && <button type="button" className="edit-toggle" aria-expanded={!collapsed} onClick={onToggleCollapsed}>{collapsed ? 'Edit code' : 'Hide editor'}</button>}
       <span className="hint">{running ? 'Tracing...' : 'Ctrl+Enter also runs. In the editor, Tab indents; press Esc then Tab to leave it.'}</span>
       <span className={`hint ${tooBig ? 'warning' : ''}`}>{size.toLocaleString()} / {MAX_SOURCE_BYTES.toLocaleString()} bytes</span></div>
-    {language === 'cpp' && <p className="run-twice warning" data-testid="run-twice-warning"><b>C++ runs your program twice:</b> once for the step-by-step recording and once for the memory check. Each run gets its own empty working folder, so relative file names do not collide. Files written with absolute paths, and network calls, can still happen twice.</p>}
+    {!collapsed && language === 'cpp' && <p className="run-twice warning" data-testid="run-twice-warning"><b>C++ runs your program twice:</b> once for the step-by-step recording and once for the memory check. Each run gets its own empty working folder, so relative file names do not collide. Files written with absolute paths, and network calls, can still happen twice.</p>}
     {cppMissing && backend.state === 'online' && <div className="offline-help" data-testid="cpp-missing"><b>C++ tools not found.</b> This backend needs {[!backend.cpp?.gpp && 'g++', !backend.cpp?.gdb && 'gdb'].filter(Boolean).join(' and ')} on its PATH. On Ubuntu or WSL: <code>sudo apt install g++ gdb</code>, then press Check again.<br/><button type="button" onClick={() => void check()}>Check again</button></div>}
     {message && <div className="error" role="alert" data-testid="run-error"><b>Run failed</b><p>{message}</p></div>}
     {info && !message && <p className="hint" data-testid="run-info">Recorded {(info.bytes / 1e6).toFixed(2)} MB in {Math.round(info.roundTripMs)} ms{info.serverMs !== null ? `, of which ${Math.round(info.serverMs)} ms on the backend` : ''}.</p>}
