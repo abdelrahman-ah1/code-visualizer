@@ -1,8 +1,21 @@
-# Milestone 2: file-based replay
+# Milestone 3: structures, animation and dark mode (replay from M2 included)
 
 A React + TypeScript interface for the existing `codeviz.trace/1.0` recordings. It reads saved state, never runs Python, and needs no backend.
 
+## What is new in M3
+
+- A **Structures** panel draws linked lists and arrays as boxes and arrows. Tags above a box are the variables that point at it, so aliases are visible (`head, other`).
+- Boxes slide when they move, new boxes pop in, and a box that changed since the previous snapshot flashes. Turn on reduced motion in your OS and all of this switches off.
+- Each structure keeps its own row, so a list does not jump around while you step. Inserting in the middle slides the later nodes right.
+- Empty and single-node lists, cycles (a curved arrow back), two lists that share a tail, nested lists and cut-off arrays (a dashed `...` cell) are all handled.
+- Dark and light mode, desktop and phone layout. On a narrow screen the diagram scrolls sideways inside its own panel.
+- Five new bundled examples (11 to 15) with their Python in `frontend/programs/`. They were recorded by the repo's own `trace_capture.py` (Python 3.10.12 here, which M1 supports).
+- The trace format and the M1 files are untouched.
+
 ## Add this pack to the repo
+
+This pack is the whole `frontend` folder again, so it replaces the M2 one. Easiest way: delete your local `frontend` folder, extract the new one in its place, then commit. Files that are new or changed in M3 are listed in `WALKTHROUGH.md`.
+
 
 1. Extract the ZIP. It contains one `frontend` folder.
 2. Open the repository root on GitHub, choose **Add file → Upload files** and drag the entire extracted `frontend` folder into the upload area. Do not upload the ZIP itself.
@@ -32,7 +45,14 @@ Open the local URL printed in the terminal, normally http://127.0.0.1:5173. Keep
 
 If scripts are blocked in Windows PowerShell, use `npm.cmd` in place of `npm`, or open Command Prompt. Do not change your machine's security settings just to run this project.
 
-## First five minutes
+## Try M3 first
+
+1. Pick `12 linked list insert` from the example menu, then drag the slider. Watch `new` appear, then `prev.next = new` splice it in between 2 and 4, then the tail point back at the head.
+2. Pick `15 alias list nodes` and step to the end. `b` tags one node while `a` tags another; the second row shows a list that joins the first.
+3. Pick `14 array mutation`. The outer `grid` list has arrows to the two inner lists.
+4. Toggle dark and light mode, and shrink the browser window to phone width.
+
+## First five minutes (from M2)
 
 1. Click **Explore alias example**. The first event is frame entry, not an executed assignment.
 2. Click **Next** until the event says `line · step 3 · line 3`. It says **Before this line executes**. Both `a` and `b` refer to `o1`, whose only item is `1`.

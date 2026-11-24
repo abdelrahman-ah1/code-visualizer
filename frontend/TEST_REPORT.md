@@ -1,4 +1,26 @@
-# M2 test report
+# M3 test report
+
+Checked 24 November 2026 on the M2 base (frontend folder from main, commit ef2299e).
+
+## Results actually run
+
+- `npm ci` clean, `npx tsc --noEmit` clean, `npm run build` passed (JS 245.5 kB / 77.4 kB gzip, CSS 7.1 kB).
+- `npm test`: **60 tests passed** (35 from M2, 25 new in `structures.test.ts`). Covers: list built at head, empty then single node, None variables, self cycle, middle insert (later node shifts right, head does not), tail-to-head cycle, aliases, split list keeps old head's row, nested arrays, omitted elements, trace not mutated, row stability on all new examples, change detection.
+- `CHROME_BIN=/usr/bin/google-chrome npm run test:ui`: **20 tests passed** in real headless Chrome (9 from M2 plus 11 new): boxes/arrows/tags, empty and single, untouched head stays put mid-transition, enter and changed marks, join arrow, arrays, cycle arrow, reduced motion gives 0s transitions, markup stays text, no page-level sideways scroll at 1280/390/320 in both themes.
+- `npm audit`: 0 vulnerabilities at check time (point in time only).
+- Python baseline was not changed or rerun. The five new traces came from the existing `trace_capture.py` on Python 3.10.12 and all report status `ok`.
+
+## Visual inspection
+
+Looked at the rendered Structures panel: a 3-node list at 1280 dark, a 4-node cyclic list at 390 light, the array/nested-list example at 1280 dark. Arrows, tags, None markers and index labels are readable. One problem found and fixed: an arrow from the outer list to the second inner list crossed the first inner list; arrows that skip a row now bow out to the right. 320 px screenshots were captured but only the 390 and 1280 ones were inspected closely.
+
+## Measured
+
+Scene building for 10,000 snapshots of a 3-node list: about 110 ms in Node 22 on one Linux core. Not measured: large heaps (hundreds of nodes) in the browser, Safari, Firefox, Windows. Animation smoothness was not judged on a real phone.
+
+---
+
+# M2 test report (earlier)
 
 Checked 24 November 2026. Base repository main commit: `67610f9c7c2613079966dd12a00bf24b388c99e3`.
 

@@ -41,4 +41,18 @@ Read these in order. Start the app and keep the alias example open while reading
 
 Why does `a` still point to `[1]` on line 3? Where is the single timer canceled? Why does `node.next → o1` not create an infinite tree? Which output is shown at the final event versus an earlier event?
 
-Next small step: run the alias walkthrough on your laptop and inspect the files above. Do not start M3 automatically.
+## Milestone 3 additions
+
+13. **src/structures.ts** (new): all the thinking, no React. It finds which heap objects are list nodes (a type with a `next` field, or exactly one field pointing at its own type) or arrays (list/tuple). It walks each list from its head, notices cycles and shared tails, gives each structure a row ("lane") and computes box positions and arrow paths. `buildScenes` runs once per trace, in order, so a structure keeps its row. Stepping backward only indexes the finished array.
+14. **src/components/Structures.tsx** (new): turns one scene into SVG. Each box sits in a group whose CSS transform is animated, and arrows live inside their source's group so they travel with it. Values are SVG text, never HTML.
+15. **src/components/Replay.tsx** (changed, 3 lines): builds the scenes and shows the panel above the source/stack/heap panels.
+16. **src/App.tsx** (changed): lists the five new examples and says Milestone 3.
+17. **src/style.css** (changed, appended block): colours via the same theme variables, transitions, the pop and flash animations. Reduced motion is already switched off by the existing global rule.
+18. **tests/structures.test.ts** and **tests/structures.spec.ts** (new): rules and real-browser checks, including screenshots into `test-results/screens`.
+19. **programs/*.py** and **public/examples/11 to 15** (new): the five example programs and their recorded traces.
+
+Questions to try: Why does a half of a split list keep the old row? Where is the "which field is the link" decision made? Why do arrows get drawn inside the source box's group? Why is a node that has no `next` field yet not drawn?
+
+Known limits: only the `next` chain is drawn for lists (a `prev` field shows only in the Heap panel). Types with two self-pointing fields (left/right) are left for the graph and tree milestone. Rows close up when a structure vanishes. Arrows may briefly lag a box that moves in a different row during the slide. IDs are not addresses.
+
+Next small step: try the five new examples, then tell me what you want M3.5 (export a session) to be. Do not start it automatically.
