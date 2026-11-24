@@ -26,7 +26,8 @@ export interface Scene {
   width: number; height: number;
 }
 
-const isArray = (n: HeapNode) => !!n.items && (n.type === 'list' || n.type === 'tuple');
+export const ARRAY_TYPES = ['list', 'tuple', 'array', 'std::vector']; // M5 adds the two C++ kinds
+const isArray = (n: HeapNode) => !!n.items && ARRAY_TYPES.includes(n.type);
 const sameTypeRef = (heap: Record<string, HeapNode>, from: HeapNode, v: Value | undefined): string | null =>
   v && v.kind === 'ref' && heap[v.id]?.fields && heap[v.id].type === from.type ? v.id : null;
 
