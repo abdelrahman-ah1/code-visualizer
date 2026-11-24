@@ -1,0 +1,55 @@
+import { test, expect } from '@playwright/test';
+import { mkdirSync, readFileSync, statSync } from 'node:fs';
+const SHOTS = process.env.SHOTS_DIR || 'test-results/screens';
+mkdirSync(SHOTS, { recursive: true });
+const OUT = 'test-results/session-out.html';
+test('export, then open the file offline: replay works, nothing leaves the page', async ({ page, browser }) => {
+  await page.goto('/');
+  await page.getByLabel('Example trace').selectOption('12_linked_list_insert');
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export session (.html)' }).click()]);
+  expect(download.suggestedFilename()).toBe('12_linked_list_insert.session.html');
+  await download.saveAs(OUT);
+  await expect(page.getByTestId('export-notice')).toContainText('source');
+  expect(statSync(OUT).size).toBeGreaterThan(100_000);
+  const html = readFileSync(OUT, 'utf8');
+  expect(html).not.toMatch(/(src|href)="https?:/);
+  expect(html).toContain("default-src 'none'");
+
+  // Fresh context, network fully blocked, opened from disk (file://), no dev server involved.
+  const ctx = await browser.newContext({ offline: true });
+  const requests: string[] = [];
+  const p = await ctx.newPage();
+  p.on('request', (r) => { if (!r.url().startsWith('file:') && !r.url().startsWith('data:') && !r.url().startsWith('blob:')) requests.push(r.url()); });
+  const errors: string[] = []; p.on('pageerror', (e) => errors.push(String(e))); p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  await p.goto('file://' + process.cwd() + '/' + OUT);
+  await expect(p.locator('.eyebrow')).toBeVisible();
+  await expect(p.getByTestId('share-notice')).toContainText('Anyone who gets the file can read all of it');
+  await expect(p.getByLabel('Example trace')).toHaveCount(0);
+  await expect(p.getByRole('button', { name: 'Export session (.html)' })).toHaveCount(0);
+  await expect(p.getByText('Event 1 of', { exact: false })).toBeVisible();
+  await p.getByRole('button', { name: 'Last', exact: true }).click();
+  await expect(p.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
+  await expect(p.getByTestId('structure-svg')).toBeVisible();
+  await expect(p.locator('.source-panel')).toContainText('new');
+  await p.screenshot({ path: `${SHOTS}/session-offline-desktop-dark.png`, fullPage: true });
+  await p.setViewportSize({ width: 390, height: 800 });
+  await p.getByRole('button', { name: 'Light mode' }).click();
+  expect(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await p.screenshot({ path: `${SHOTS}/session-offline-phone-light.png`, fullPage: true });
+  expect(requests).toEqual([]); expect(errors).toEqual([]);
+  await ctx.close();
+});
+test('hostile source text in an exported session stays text', async ({ page, browser }) => {
+  await page.goto('/');
+  const t = JSON.parse(readFileSync(new URL('../public/examples/05_alias.trace.json', import.meta.url), 'utf8'));
+  t.source = '<img src=x onerror="window.__pwned=1">\n</script><script>window.__pwned=2</script>\n' + t.source;
+  await page.locator('input[type=file]').setInputFiles({ name: 'evil.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(t)) });
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export session (.html)' }).click()]);
+  await download.saveAs('test-results/evil.session.html');
+  const ctx = await browser.newContext({ offline: true }); const p = await ctx.newPage();
+  await p.goto('file://' + process.cwd() + '/test-results/evil.session.html');
+  await expect(p.locator('.source-panel')).toContainText('</script><script>window.__pwned=2</script>');
+  expect(await p.evaluate(() => (window as unknown as { __pwned?: number }).__pwned)).toBeUndefined();
+  expect(await p.locator('.source-panel img').count()).toBe(0);
+  await ctx.close();
+});
