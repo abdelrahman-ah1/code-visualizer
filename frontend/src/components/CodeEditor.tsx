@@ -4,7 +4,7 @@ import type { KeyboardEvent } from 'react';
 // A plain <textarea> with a line-number gutter. No editor library: a library such as
 // CodeMirror or Monaco adds hundreds of kB and a build step, and the pasted programs here are
 // capped at 64 KiB. Revisit if syntax highlighting is wanted (measure the bundle first).
-export function CodeEditor({ value, onChange, onRun }: { value: string; onChange: (v: string) => void; onRun: () => void }) {
+export function CodeEditor({ value, onChange, onRun, label = 'Python source code' }: { value: string; onChange: (v: string) => void; onRun: () => void; label?: string }) {
   const gutter = useRef<HTMLPreElement>(null), escaped = useRef(false);
   // Only rebuilt when the NUMBER of lines changes, not on every keystroke.
   const lineCount = value.split('\n').length;
@@ -25,7 +25,7 @@ export function CodeEditor({ value, onChange, onRun }: { value: string; onChange
   }
   return <div className="editor">
     <pre className="gutter" aria-hidden="true" ref={gutter}>{numbers}</pre>
-    <textarea aria-label="Python source code" value={value} spellCheck={false} wrap="off" autoCapitalize="off" autoCorrect="off"
+    <textarea aria-label={label} value={value} spellCheck={false} wrap="off" autoCapitalize="off" autoCorrect="off"
       onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown}
       onScroll={(e) => { if (gutter.current) gutter.current.scrollTop = e.currentTarget.scrollTop; }}/>
   </div>;
