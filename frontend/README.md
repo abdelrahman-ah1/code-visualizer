@@ -1,8 +1,17 @@
-# Milestone 3: structures, animation and dark mode (replay from M2 included)
+# Milestone 3.5: export a session (M2 replay and M3 structures included)
 
 A React + TypeScript interface for the existing `codeviz.trace/1.0` recordings. It reads saved state, never runs Python, and needs no backend.
 
-## What is new in M3
+## What is new in M3.5
+
+- An **Export session (.html)** button appears under the recording name once a trace is loaded. It downloads one file, for example `12_linked_list_insert.session.html`.
+- Double-click that file (or drag it into any modern browser). It replays the recording with no server, no internet and no install. It opens in a "Shared session" view: no example menu, no file picker, no export button. Everything else (stepping, structures, dark mode) works as before.
+- The file contains the replay app itself plus the recording: the program source, every captured value and the program output. It contains nothing else, no file paths, no credentials. **Whoever receives the file can read all of it**, so share it only when you are happy to share the code and its output. The app says this next to the button and inside the shared view.
+- The file blocks all network access by itself (a Content-Security-Policy with `default-src 'none'`), and the source and output are inserted as text, never as markup.
+- `sample-sessions/12_linked_list_insert.session.html` is a ready-made example. Double-click it to see what a recipient sees.
+- No real share link yet: that needs hosting (open question in plan.md).
+
+## What was new in M3
 
 - A **Structures** panel draws linked lists and arrays as boxes and arrows. Tags above a box are the variables that point at it, so aliases are visible (`head, other`).
 - Boxes slide when they move, new boxes pop in, and a box that changed since the previous snapshot flashes. Turn on reduced motion in your OS and all of this switches off.
@@ -14,7 +23,7 @@ A React + TypeScript interface for the existing `codeviz.trace/1.0` recordings. 
 
 ## Add this pack to the repo
 
-This pack is the whole `frontend` folder again, so it replaces the M2 one. Easiest way: delete your local `frontend` folder, extract the new one in its place, then commit. Files that are new or changed in M3 are listed in `WALKTHROUGH.md`.
+This pack is the whole `frontend` folder again, so it replaces the M3 one. Easiest way: delete your local `frontend` folder, extract the new one in its place, then commit. Files that are new or changed in M3 are listed in `WALKTHROUGH.md`.
 
 
 1. Extract the ZIP. It contains one `frontend` folder.
@@ -41,9 +50,16 @@ npm ci
 npm run dev
 ```
 
-Open the local URL printed in the terminal, normally http://127.0.0.1:5173. Keep that terminal running. Ctrl+C stops it. Do not double-click `index.html`: Vite must serve the app. Installation needs internet once; playback uses local files and bundled assets only.
+Open the local URL printed in the terminal, normally http://127.0.0.1:5173. Keep that terminal running. Ctrl+C stops it. Do not double-click `index.html` or anything in `dist/`: Vite must serve the app. Only exported `*.session.html` files are meant to be double-clicked. Installation needs internet once; playback uses local files and bundled assets only.
 
 If scripts are blocked in Windows PowerShell, use `npm.cmd` in place of `npm`, or open Command Prompt. Do not change your machine's security settings just to run this project.
+
+## Try M3.5 first
+
+1. Run `npm run dev`, pick `12 linked list insert`, click **Export session (.html)**. Your browser saves the file.
+2. Turn off Wi-Fi if you like, then open the saved file straight from your Downloads folder. Click Last: the list is spliced and the tail points back to the head.
+3. Open `sample-sessions/12_linked_list_insert.session.html` the same way.
+4. Production check: `npm run build` also writes `dist/session-template.html`, the file the export starts from.
 
 ## Try M3 first
 
@@ -106,7 +122,7 @@ The last two commands are optional for normal use, required for browser tests. P
 - All seven run statuses, snapshot omissions, opaque values and truncated values remain visible. `complete` does not mean every value was captured.
 - Empty recordings, one-event recordings and partial captures are supported. Broken/missing fields or references get a field-specific error; the previous valid recording is kept.
 - Reader limits: 20 MiB and 10,000 events. The exact documented schema 1.0 is supported. Future minor versions require a compatibility review rather than silently guessing.
-- No editor, tracing API, backend, breakpoints, watch expressions, export, hosted runner or structure layout. Those are later milestones.
+- No editor, tracing API, backend, breakpoints, watch expressions, hosted runner or share link. Those are later milestones. Export exists as of M3.5.
 
 The M1 runner is only for trusted local programs, not a sandbox. Replay cannot undo side effects from the original run. Do not run strangers' source or expose the runner on the internet.
 
