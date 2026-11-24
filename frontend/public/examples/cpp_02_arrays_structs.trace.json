@@ -1,0 +1,2793 @@
+{
+ "schema_version": "codeviz.trace/1.0",
+ "runtime": {
+  "implementation": "g++ + gdb",
+  "version": "g++ 11.4.0, gdb 12.1"
+ },
+ "source": "#include <iostream>\nstruct Point { int x; int y; };\nint total = 0;\nint sum(int* a, int n) {\n    int s = 0;\n    for (int i = 0; i < n; i++) s += a[i];\n    return s;\n}\nint main() {\n    int arr[4] = {5, 1, 4, 2};\n    Point p = {3, 4};\n    Point* q = &p;\n    q->x = 9;\n    int* heap = new int[3];\n    for (int i = 0; i < 3; i++) heap[i] = i * i;\n    total = sum(arr, 4) + sum(heap, 3);\n    double ratio = total / 4.0;\n    char letter = 'A';\n    bool ok = total > 10;\n    std::cout << total << \" \" << ratio << \"\\n\";\n    delete[] heap;\n    return 0;\n}\n",
+ "limits": {
+  "wall_seconds": 5.0,
+  "events": 500,
+  "output_chars": 8192
+ },
+ "events": [
+  {
+   "step": 0,
+   "event": "call",
+   "line": 9,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 9,
+     "locals": {}
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 1,
+   "event": "line",
+   "line": 10,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 10,
+     "locals": {}
+    }
+   ],
+   "heap": {},
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 2,
+   "event": "line",
+   "line": 11,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 11,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 3,
+   "event": "line",
+   "line": 12,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 12,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 3
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 4,
+   "event": "line",
+   "line": 13,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 13,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 3
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 5,
+   "event": "line",
+   "line": 14,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 14,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 6,
+   "event": "line",
+   "line": 15,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 15,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o3": {
+     "type": "array",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 7,
+   "event": "line",
+   "line": 16,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 16,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o3": {
+     "type": "array",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 8,
+   "event": "call",
+   "line": 5,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 16,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    {
+     "depth": 2,
+     "function": "sum",
+     "line": 5,
+     "locals": {
+      "a": {
+       "kind": "ref",
+       "id": "o4"
+      },
+      "n": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o3": {
+     "type": "array",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     ]
+    },
+    "o4": {
+     "type": "int",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 9,
+   "event": "line",
+   "line": 6,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 16,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    {
+     "depth": 2,
+     "function": "sum",
+     "line": 6,
+     "locals": {
+      "a": {
+       "kind": "ref",
+       "id": "o4"
+      },
+      "n": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      "s": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o3": {
+     "type": "array",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     ]
+    },
+    "o4": {
+     "type": "int",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 10,
+   "event": "line",
+   "line": 7,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 16,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    {
+     "depth": 2,
+     "function": "sum",
+     "line": 7,
+     "locals": {
+      "a": {
+       "kind": "ref",
+       "id": "o4"
+      },
+      "n": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      "s": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 12
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o3": {
+     "type": "array",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     ]
+    },
+    "o4": {
+     "type": "int",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 11,
+   "event": "return",
+   "line": 8,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 16,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    {
+     "depth": 2,
+     "function": "sum",
+     "line": 8,
+     "locals": {
+      "a": {
+       "kind": "ref",
+       "id": "o4"
+      },
+      "n": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      "s": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 12
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o3": {
+     "type": "array",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     ]
+    },
+    "o4": {
+     "type": "int",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "fields": {
+      "value": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      }
+     }
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "scalar",
+    "type": "int",
+    "value": 12
+   }
+  },
+  {
+   "step": 12,
+   "event": "call",
+   "line": 5,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 16,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    {
+     "depth": 2,
+     "function": "sum",
+     "line": 5,
+     "locals": {
+      "a": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "n": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 3
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o3": {
+     "type": "array",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 13,
+   "event": "line",
+   "line": 6,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 16,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    {
+     "depth": 2,
+     "function": "sum",
+     "line": 6,
+     "locals": {
+      "a": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "n": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 3
+      },
+      "s": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o3": {
+     "type": "array",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 14,
+   "event": "line",
+   "line": 7,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 16,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    {
+     "depth": 2,
+     "function": "sum",
+     "line": 7,
+     "locals": {
+      "a": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "n": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 3
+      },
+      "s": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o3": {
+     "type": "array",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 15,
+   "event": "return",
+   "line": 8,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 16,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    },
+    {
+     "depth": 2,
+     "function": "sum",
+     "line": 8,
+     "locals": {
+      "a": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "n": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 3
+      },
+      "s": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o3": {
+     "type": "array",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "scalar",
+    "type": "int",
+    "value": 5
+   }
+  },
+  {
+   "step": 16,
+   "event": "line",
+   "line": 16,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 16,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o3": {
+     "type": "array",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 17,
+   "event": "line",
+   "line": 17,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 17
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 17,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o3"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o3": {
+     "type": "array",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 18,
+   "event": "line",
+   "line": 18,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 17
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 18,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "ratio": {
+       "kind": "scalar",
+       "type": "double",
+       "value": 4.25
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o3": {
+     "type": "array",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 19,
+   "event": "line",
+   "line": 19,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 17
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 19,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "ratio": {
+       "kind": "scalar",
+       "type": "double",
+       "value": 4.25
+      },
+      "letter": {
+       "kind": "scalar",
+       "type": "char",
+       "value": "A"
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o3": {
+     "type": "array",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 20,
+   "event": "line",
+   "line": 20,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 17
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 20,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "ratio": {
+       "kind": "scalar",
+       "type": "double",
+       "value": 4.25
+      },
+      "letter": {
+       "kind": "scalar",
+       "type": "char",
+       "value": "A"
+      },
+      "ok": {
+       "kind": "scalar",
+       "type": "bool",
+       "value": true
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o3": {
+     "type": "array",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     ]
+    }
+   },
+   "stdout": "",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 21,
+   "event": "line",
+   "line": 21,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 17
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 21,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o3"
+      },
+      "ratio": {
+       "kind": "scalar",
+       "type": "double",
+       "value": 4.25
+      },
+      "letter": {
+       "kind": "scalar",
+       "type": "char",
+       "value": "A"
+      },
+      "ok": {
+       "kind": "scalar",
+       "type": "bool",
+       "value": true
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o3": {
+     "type": "array",
+     "storage": "heap",
+     "address": "0x55555556aeb0",
+     "element_type": "int",
+     "length": 3,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 0
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     ]
+    }
+   },
+   "stdout": "17 4.25\n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 22,
+   "event": "line",
+   "line": 22,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 17
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 22,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o5"
+      },
+      "ratio": {
+       "kind": "scalar",
+       "type": "double",
+       "value": 4.25
+      },
+      "letter": {
+       "kind": "scalar",
+       "type": "char",
+       "value": "A"
+      },
+      "ok": {
+       "kind": "scalar",
+       "type": "bool",
+       "value": true
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o5": {
+     "type": "int",
+     "opaque": true,
+     "freed": true,
+     "storage": "heap",
+     "address": "0x55555556aeb0"
+    }
+   },
+   "stdout": "17 4.25\n",
+   "stderr": "",
+   "truncated": []
+  },
+  {
+   "step": 23,
+   "event": "return",
+   "line": 23,
+   "frames": [
+    {
+     "depth": 0,
+     "function": "<globals>",
+     "line": 9,
+     "locals": {
+      "total": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 17
+      }
+     }
+    },
+    {
+     "depth": 1,
+     "function": "main",
+     "line": 23,
+     "locals": {
+      "arr": {
+       "kind": "ref",
+       "id": "o1"
+      },
+      "p": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "q": {
+       "kind": "ref",
+       "id": "o2"
+      },
+      "heap": {
+       "kind": "ref",
+       "id": "o5"
+      },
+      "ratio": {
+       "kind": "scalar",
+       "type": "double",
+       "value": 4.25
+      },
+      "letter": {
+       "kind": "scalar",
+       "type": "char",
+       "value": "A"
+      },
+      "ok": {
+       "kind": "scalar",
+       "type": "bool",
+       "value": true
+      }
+     }
+    }
+   ],
+   "heap": {
+    "o1": {
+     "type": "array",
+     "storage": "stack",
+     "address": "0x7fffffffeb10",
+     "element_type": "int",
+     "length": 4,
+     "items": [
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 5
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 1
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      },
+      {
+       "kind": "scalar",
+       "type": "int",
+       "value": 2
+      }
+     ]
+    },
+    "o2": {
+     "type": "Point",
+     "storage": "stack",
+     "address": "0x7fffffffeb08",
+     "fields": {
+      "x": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 9
+      },
+      "y": {
+       "kind": "scalar",
+       "type": "int",
+       "value": 4
+      }
+     }
+    },
+    "o5": {
+     "type": "int",
+     "opaque": true,
+     "freed": true,
+     "storage": "heap",
+     "address": "0x55555556aeb0"
+    }
+   },
+   "stdout": "17 4.25\n",
+   "stderr": "",
+   "truncated": [],
+   "return_value": {
+    "kind": "scalar",
+    "type": "int",
+    "value": 0
+   }
+  }
+ ],
+ "diagnostics": [
+  {
+   "source": "compiler",
+   "severity": "warning",
+   "kind": "compiler-warning",
+   "message": "unused variable \u2018letter\u2019 [-Wunused-variable]",
+   "line": 18,
+   "column": 10
+  },
+  {
+   "source": "compiler",
+   "severity": "warning",
+   "kind": "compiler-warning",
+   "message": "unused variable \u2018ok\u2019 [-Wunused-variable]",
+   "line": 19,
+   "column": 10
+  }
+ ],
+ "compile_ms": 283.7,
+ "trace_ms": 370.0,
+ "status": "ok",
+ "complete": true,
+ "stdout": "17 4.25\n",
+ "stderr": "",
+ "exit_code": 0
+}
