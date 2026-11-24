@@ -1,0 +1,107 @@
+{
+  "schema_version": "codeviz.trace/1.0",
+  "runtime": {
+    "implementation": "cpython",
+    "version": "3.11.9"
+  },
+  "source": "name = input()\nprint('Hello', name)\n",
+  "limits": {
+    "wall_seconds": 2.0,
+    "events": 500,
+    "output_chars": 8192
+  },
+  "events": [
+    {
+      "step": 0,
+      "event": "call",
+      "line": 0,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 0,
+          "locals": {}
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 1,
+      "event": "line",
+      "line": 1,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 1,
+          "locals": {}
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 2,
+      "event": "line",
+      "line": 2,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 2,
+          "locals": {
+            "name": {
+              "kind": "scalar",
+              "type": "str",
+              "value": "Ada",
+              "truncated": false
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "",
+      "stderr": "",
+      "truncated": []
+    },
+    {
+      "step": 3,
+      "event": "return",
+      "line": 2,
+      "frames": [
+        {
+          "depth": 0,
+          "function": "<module>",
+          "line": 2,
+          "locals": {
+            "name": {
+              "kind": "scalar",
+              "type": "str",
+              "value": "Ada",
+              "truncated": false
+            }
+          }
+        }
+      ],
+      "heap": {},
+      "stdout": "Hello Ada\n",
+      "stderr": "",
+      "truncated": [],
+      "return_value": {
+        "kind": "scalar",
+        "type": "NoneType",
+        "value": null
+      }
+    }
+  ],
+  "status": "ok",
+  "complete": true,
+  "stdout": "Hello Ada\n",
+  "stderr": "",
+  "resource_limits_applied": false
+}
