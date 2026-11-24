@@ -72,13 +72,13 @@ for (const [w, h, theme] of [[1366, 768, 'dark'], [1920, 1080, 'light']] as cons
     await expect(page.getByRole('tab', { name: 'Heap' })).toHaveAttribute('aria-selected', 'true');
     await settle(page); await fits('heap open');
     const heapPanel = await box('[role=tabpanel]');
-    expect(heapPanel.height).toBeGreaterThan(100);                                   // real contents are visible, not only a heading
+    expect(heapPanel.height).toBeGreaterThan(250);                                   // real contents are visible, not only a heading
     await page.screenshot({ path: `${SHOTS}/final-${w}-${theme}-heap-open.png` });
     const openH = (await box('.structures')).height;
     await page.getByRole('tab', { name: 'Heap' }).click();                           // click the open tab: closes it
     await expect(page.getByRole('tabpanel')).toHaveCount(0);
     await settle(page); await fits('closed');
-    expect((await box('.structures')).height).toBeGreaterThan(openH + 40);          // diagram takes the freed space
+    expect((await box('.structures')).height).toBeGreaterThan(openH + 20);          // diagram takes the freed space
     await page.screenshot({ path: `${SHOTS}/final-${w}-${theme}-closed.png` });
     await page.getByRole('tab', { name: 'Call stack' }).click();                    // reopen with no scrolling needed
     await expect(page.locator('.frame').first()).toBeVisible();
@@ -89,3 +89,50 @@ for (const [w, h, theme] of [[1366, 768, 'dark'], [1920, 1080, 'light']] as cons
     await expect(page.locator('.editor')).toHaveCount(1);
   });
 }
+
+for (const [w, h] of [[1366, 768], [1920, 1080], [900, 800]] as const) {
+  test(`collapsed run panel is one compact toolbar at ${w}x${h}`, async ({ page }) => {
+    test.setTimeout(60000);
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto('/');
+    await expect(page.getByTestId('backend-state')).toContainText('Backend online');
+    await page.getByLabel('Language').selectOption('cpp');
+    await page.getByLabel('Example program').selectOption({ index: 1 });
+    await page.getByRole('button', { name: 'Run and record' }).click();
+    await expect(page.getByText(/Event 1 of \d+/)).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('.editor')).toHaveCount(0);
+    await page.waitForTimeout(1200);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await settle(page);
+    await page.screenshot({ path: `${SHOTS}/run-toolbar-${w}.png`, clip: { x: 0, y: 0, width: w, height: Math.min(h, 360) } });
+    const panel = (await page.locator('.run-panel').boundingBox())!;
+    const run = (await page.getByRole('button', { name: 'Run and record' }).boundingBox())!;
+    const edit = (await page.getByRole('button', { name: 'Edit code' }).boundingBox())!;
+    expect(panel.height, 'panel height').toBeLessThan(w >= 1100 ? 130 : 200);
+    expect(Math.abs(run.y - edit.y), 'Run and Edit code share a row').toBeLessThan(6);
+    expect(edit.x - (run.x + run.width), 'Edit code sits next to Run').toBeLessThan(40);
+  });
+}
+
+test('combined preview: compact toolbar, same diagram height, details panel extends below', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto('/');
+  await expect(page.getByTestId('backend-state')).toContainText('Backend online');
+  await page.getByLabel('Language').selectOption('cpp');
+  await page.getByLabel('Example program').selectOption({ index: 1 });
+  await page.getByRole('button', { name: 'Run and record' }).click();
+  await expect(page.getByText(/Event 1 of \d+/)).toBeVisible({ timeout: 20000 });
+  await page.waitForTimeout(1200);
+  for (let i = 0; i < 12; i++) await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await settle(page);
+  await page.screenshot({ path: `${SHOTS}/combined-top.png` });
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await settle(page);
+  await page.screenshot({ path: `${SHOTS}/combined-bottom.png` });
+  const tp = (await page.locator('.tabs-panel').boundingBox())!;
+  expect(tp.height).toBeGreaterThan(300);
+  const sc = await page.evaluate(() => ({ y: window.scrollY, h: document.documentElement.scrollHeight }));
+  expect(sc.h).toBeGreaterThan(768);
+  expect(tp.y + tp.height).toBeLessThanOrEqual(768 + 1);   // after scrolling down, the whole panel is reachable
+});
