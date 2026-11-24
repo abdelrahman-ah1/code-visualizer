@@ -133,3 +133,14 @@ main[data-theme=light] .bp-hit { color:#a01628; }
 .watch-jump { display:flex; gap:6px; }
 .watch-changed { color:var(--warn); font-weight:600; }
 @media(max-width:600px) { .editor { height:240px; } .run-bar { gap:10px; flex-direction:column; } }
+
+/* M5: diagnostics panel */
+.diagnostics ul { list-style:none; margin:8px 0; padding:0; display:grid; gap:8px; }
+.diag { border-left:4px solid var(--muted, #8a93a5); padding:6px 12px; background:rgba(127,127,127,.08); border-radius:4px; }
+.diag.error { border-left-color:#f0787e; }
+.diag.warning { border-left-color:#e3b341; }
+.diag p { margin:4px 0 0; overflow-wrap:anywhere; }
+.diag-source, .diag-line { margin-left:10px; font-size:.85em; opacity:.8; }
+.run-status .overall { display:block; font-size:1.05em; color:var(--danger, #ff8a80); margin-bottom:4px; }
+.run-status.warning { border-left-color:#e0a030; }
+.run-status:has(.overall) { border-left-color:#ff6b6b; }
