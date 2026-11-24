@@ -73,3 +73,40 @@ Questions to try: Why is the trace stored in `<script type="application/json">` 
 Known limits: the file is about 250 kB because it carries the whole app. It needs a browser that supports ES modules from `file://` (current Chrome, Edge, Firefox, Safari all do; only Chrome was tested here). A session cannot be re-exported from the shared view. The exported app is a snapshot of the app version that made it. Anyone with the file can edit it, so treat a received session like any HTML file: open only files from people you trust, because the script inside it is whatever the sender put there.
 
 Next small step: try export and the offline open, then say if anything is off. M4 (backend and editor) is next in plan.md, not started.
+
+
+## Milestone 4 additions
+
+Backend (in `backend/`, outside `frontend`):
+
+28. **backend/app.py** (new): the whole server, about 130 lines. `POST /api/trace` validates the request, calls `trace_capture.capture()` and returns its result as JSON text built once with `json.dumps` (returning a dict is about 12x slower, see PERF_REPORT.md). `GET /api/examples` lists the example programs. `GET /api/health` says it is alive. The `guard` function runs before every request: the Host header must be localhost, the Origin (if any) must be an allowed page, POSTs must be `application/json` and under 300 kB. That stops a web page you happen to visit from sending code to your computer. A semaphore allows two runs at once and answers 429 beyond that.
+29. **backend/requirements.txt** (new): FastAPI, uvicorn and httpx (httpx only for tests), pinned.
+30. **backend/examples/16 to 19** (new): bubble sort, reverse a linked list, memoized Fibonacci (a dict), and a 1,800-event loop for performance.
+31. **backend/tests/test_api.py** (new): 28 tests against the real tracer: results equal to the tracer's own, stdin, exceptions, syntax errors, timeouts, limits, validation, the 403 / 413 / 415 / 422 / 429 paths, gzip, and that a slot is freed even if the tracer crashes.
+32. **backend/bench.py** and **backend/README.md** (new): timing script and how to run and call the backend.
+
+Frontend (in `frontend/`):
+
+33. **src/breakpoints.ts** (new, no React): `buildLineIndex` maps each source line to the event numbers where a `line` event happens; `stopIndexes` merges the chosen lines; `nextStop` / `prevStop` / `isStop` are binary searches. Only `line` events count, so a recursive call does not stop twice.
+34. **src/watch.ts** (new, no React): `parseWatch` accepts only names, `.field`, `[number]` and `['key']`. `resolveWatch` walks that path through one snapshot's frames and heap. `describe` prints a short readable value (cycles show as `<o3>`). `watchSignatures` makes one comparison string per event (including object IDs, so rebinding to an equal copy counts as a change) and `changeIndexes` turns them into "steps where it changed".
+35. **src/usePlayback.ts** (changed): takes the stop list. When the one playback timer lands on a stop it pauses. Also adds `nextBreak` / `prevBreak`.
+36. **src/components/Source.tsx** (changed): each line is its own memoized `CodeLine`; the line number is now a button that toggles a breakpoint.
+37. **src/components/Controls.tsx** (changed): two new buttons, disabled when there is no stop in that direction.
+38. **src/components/Watch.tsx** (new): the watch panel. Each row computes its signatures once per trace.
+39. **src/components/Replay.tsx** (changed): builds the line index and stops, shows the breakpoint note and "Breakpoint hit" label, and the Watch panel.
+40. **src/components/CodeEditor.tsx** (new): textarea plus a line-number gutter that scrolls with it. Tab indents; Esc then Tab leaves the editor so keyboard users are not trapped.
+41. **src/components/RunPanel.tsx** (new): backend status, example menu, limits, Run / Cancel, error and offline help. It sends the request, passes the text on and never parses it itself. A request counter makes a cancelled or late answer harmless.
+42. **src/App.tsx** (changed): keeps the editor draft (saved in your browser's localStorage, never exported), breakpoints and watches; run results go through the same `parseTrace` check as files. Shows when the editor changed since the recorded run.
+43. **vite.config.ts** (changed): forwards `/api` to the backend, so the page only talks to its own address.
+44. **src/style.css** (changed, appended): editor, run panel, breakpoint marker, watch cards.
+45. **tests/breakpoints.test.ts**, **tests/watch.test.ts**, **tests/m4perf.test.ts** (new): hand-derived expectations on recorded fixtures, plus timings on 10,000 events.
+46. **tests/m4.spec.ts**, **tests/performance.spec.ts** (new): real Chrome, real backend: run, examples, failures, breakpoints, watch, offline, cancel, draft, export-then-open-offline, screenshots, and measurements.
+47. **playwright.config.ts** (changed): also starts the backend.
+48. **perf/measure.mjs** and **PERF_REPORT.md** (new): the measuring script and the results.
+49. **sample-sessions/12_linked_list_insert.session.html** (regenerated with the M4 build) and **package.json** (version 0.4.0 only).
+
+Questions to try: Why does `guard` check the Host header as well as the Origin? Why is a breakpoint a recorded stop instead of running the code to a line? Why does a watch store signatures instead of the values? What would break if `Source` were not memoized? Why does a failed run still answer HTTP 200?
+
+Known limits: the editor has no syntax colors. Breakpoints and watches work on the recording: a watch cannot evaluate expressions like `a + b`, and a variable that exists only in an enclosing function is not found from an inner one. A cancelled run still finishes on the backend (up to its time limit). The backend is not a sandbox. Python only; C++ is M5.
+
+Next small step: run it, try the example programs with breakpoints and watches, and report anything odd. M5 (C++) is gated and not started.
