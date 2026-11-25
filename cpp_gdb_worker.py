@@ -9,6 +9,7 @@ Snapshots use the same shape as the Python tracer (TRACE_FORMAT.md, codeviz.trac
 What it does NOT do: judge whether the program is correct. Memory errors are found by a second,
 separate run (see cpp_trace.py). Every number in a snapshot is read from the stopped program.
 """
+import errno
 import bisect
 import json
 import math
@@ -24,7 +25,7 @@ REQ = json.load(open(os.path.join(D, "request.json"), encoding="utf-8"))
 SRC = os.path.realpath(REQ["source_path"])
 MAX_EVENTS = REQ["max_events"]
 MAX_OUT = REQ["max_output"]
-MAX_FRAMES, MAX_NODES, MAX_DEPTH, MAX_ITEMS, MAX_LOCALS = 32, 300, 64, 40, 40
+MAX_FRAMES, MAX_NODES, MAX_DEPTH, MAX_ITEMS, MAX_LOCALS = 32, 300, 300, 40, 40
 FATAL = {"SIGSEGV", "SIGABRT", "SIGFPE", "SIGBUS", "SIGILL", "SIGTERM", "SIGXCPU", "SIGXFSZ", "SIGPIPE", "SIGSYS", "SIGTRAP"}
 
 EVENTS = open(os.path.join(D, "events.jsonl"), "w", encoding="utf-8")
@@ -175,8 +176,18 @@ class AllocDone(gdb.FinishBreakpoint):
 _ALLOC = re.compile(r",\s*std::allocator<[^<>]*(?:<[^<>]*>[^<>]*)*>\s*")
 
 
+_PRETTY = {}
+
+
 def pretty(name):
-    """Shorten the very long names gdb gives to standard library types."""
+    """Shorten the very long names gdb gives to standard library types (pure function, memoized)."""
+    r = _PRETTY.get(name)
+    if r is None:
+        r = _PRETTY[name] = _pretty(name)
+    return r
+
+
+def _pretty(name):
     name = name.replace("std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >", "std::string")
     name = name.replace("std::__cxx11::", "std::")
     for _ in range(4):
@@ -189,6 +200,21 @@ def printer_for(val):
         return gdb.default_visualizer(val)
     except gdb.error:
         return None
+
+
+LIB_MAPS = {"std::map", "std::unordered_map", "std::multimap"}
+LIB_SEQS = {"std::set", "std::multiset", "std::unordered_set", "std::list", "std::deque", "std::forward_list"}
+KNOWN_TYPES = {}   # allocation serial -> gdb type last seen through a typed pointer
+
+
+def first_template_arg(text):
+    depth = 0
+    for i, ch in enumerate(text):
+        depth += ch == "<"
+        depth -= ch == ">"
+        if ch == "," and depth == 0:
+            return text[:i]
+    return text
 
 
 class Encoder:
@@ -207,6 +233,8 @@ class Encoder:
 
     def snapshot(self, frames, ret=None):
         self.heap, self.truncated, self.queue = {}, [], []
+        self.owned = set()     # live blocks that belong to a drawn library object (string/vector buffer, smart pointer control block)
+        self.seen = set()      # block starts some traversed pointer pointed at, before orphan recovery
         self.node_count = 0
         self.returned = None
         out = []
@@ -223,7 +251,136 @@ class Encoder:
         while self.queue:
             nid, val, info, depth = self.queue.pop(0)
             self.expand(nid, val, info, depth)
+        self.recover_orphans()
         return out
+
+    def raw_block(self, rec):
+        """A live block no typed pointer was ever seen at: shown as its raw bytes. No type is guessed."""
+        if self.node_count >= MAX_NODES:
+            if "orphans" not in self.truncated:
+                self.truncated.append("orphans")
+            return
+        key = ("h", rec["serial"], 0, "untyped")
+        nid = self.ids.get(key)
+        if nid is None:
+            self.next_id += 1
+            nid = self.ids[key] = f"o{self.next_id}"
+        if nid in self.heap:
+            return
+        n = min(rec["size"], MAX_ITEMS)
+        try:
+            data = bytes(gdb.selected_inferior().read_memory(rec["start"], n))
+        except gdb.error:
+            return
+        self.node_count += 1
+        node = {"type": "untyped block", "storage": "heap", "address": hex(rec["start"]), "element_type": "byte",
+                "length": rec["size"], "items": [{"kind": "scalar", "type": "byte", "value": b} for b in data]}
+        if rec["size"] > n:
+            node["truncated"] = True
+            self.truncated.append("items")
+        self.heap[nid] = node
+
+    def own(self, val):
+        """Blocks a library object (std::string, vector, smart pointer...) holds: found by looking at the object's own words."""
+        try:
+            a = int(val.address)
+            n = min(val.type.sizeof, 128)
+            data = bytes(gdb.selected_inferior().read_memory(a, n))
+        except (gdb.error, TypeError, ValueError, OverflowError):
+            return False
+        for i in range(0, n - 7, 8):
+            rec = ALLOCS.find(int.from_bytes(data[i:i + 8], "little"))
+            if rec is not None and not rec["freed"]:
+                self.owned.add(rec["start"])
+
+    def buffer_released(self, val, base):
+        """True when the library object's OWN backing buffer was freed (the object was destroyed or its storage released).
+
+        Decided from the one word libstdc++ uses to point at that storage, never from any word that merely equals a freed
+        address (user data, element values and dangling user pointers live elsewhere):
+          std::vector / deque / unordered_*  word 0 (_M_start / _M_map / _M_buckets); forward_list / list: word 0 (first node)
+          std::set / map (red-black tree): word 2 (header._M_parent, the root)
+          std::string: word 0 (_M_p) unless it points at the inline buffer inside the object."""
+        # Offsets below are libstdc++ (GNU, new string ABI) on x86-64 only. Outside that, or when the object size is not the
+        # expected one, make no claim (return False) rather than guess at another layout.
+        expect = {"std::string": 32, "std::vector": 24, "std::deque": 80, "std::list": 24, "std::forward_list": 8,
+                  "std::map": 48, "std::multimap": 48, "std::set": 48, "std::multiset": 48}
+        try:
+            if gdb.selected_frame().architecture().name() != "i386:x86-64":
+                return False
+            if val.type.strip_typedefs().sizeof != expect.get(base):
+                return False
+            pr = printer_for(val)       # must be libstdc++'s own pretty printer, and the string must be the new (cxx11) ABI
+            if pr is None or not type(pr).__module__.startswith("libstdcxx"):
+                return False
+            if base == "std::string" and "__cxx11" not in str(val.type.strip_typedefs()):
+                return False
+            a = int(val.address)
+            n = min(val.type.sizeof, 48)
+            data = bytes(gdb.selected_inferior().read_memory(a, n))
+        except (gdb.error, TypeError, ValueError, OverflowError):
+            return False
+        w = lambda k: int.from_bytes(data[8 * k:8 * k + 8], "little") if len(data) >= 8 * k + 8 else 0
+        if base in ("std::map", "std::multimap", "std::set", "std::multiset"):
+            p = w(2)
+        else:
+            p = w(0)
+        if p == 0 or (base == "std::string" and p == a + 16):
+            return False
+        rec = ALLOCS.find(p)
+        return rec is not None and rec["freed"] and rec["start"] == p
+
+    def recover_orphans(self):
+        """Live heap objects no pointer leads to any more (for example behind a freed node) are still real memory.
+
+        A block whose type was seen earlier through a typed pointer is read again as that type and added to the heap
+        flagged "orphan", so the diagram can still show it. A block never seen with a type stays uncovered and is only
+        counted (unreached_heap). Freed memory is never read.
+        """
+        if not ALLOCS.by_start:
+            return
+        covered = covered_blocks(self.heap, self.owned)
+        seen = set(self.seen)       # frozen: pointers met while recovering must not hide an orphan
+        added = 0
+        recovered = []
+        for start, rec in list(ALLOCS.by_start.items()):
+            if rec["freed"] or start in covered:
+                continue
+            if rec["serial"] not in KNOWN_TYPES:
+                self.raw_block(rec)
+                continue
+            if self.node_count >= MAX_NODES:                 # the same budget as every other node, never silent
+                if "orphans" not in self.truncated:
+                    self.truncated.append("orphans")
+                break
+            t = KNOWN_TYPES[rec["serial"]]
+            try:
+                val = gdb.Value(start).cast(t.pointer()).dereference()
+                ref = self.pointee(start, val, str(t), 1, ptr_target=t)
+            except gdb.error:
+                continue
+            if ref.get("kind") == "ref" and ref["id"] in self.heap:
+                recovered.append((start, ref["id"]))
+                added += 1
+        while self.queue:
+            nid, val, info, depth = self.queue.pop(0)
+            self.expand(nid, val, info, depth)
+        # Orphan = not reachable from any local, any drawn object, or any block a drawn pointer pointed at. A node only
+        # cut off by the depth limit is reachable: it is drawn but not called unreachable.
+        recovered_ids = {rid for _, rid in recovered}
+        stack = [nid for nid, node in self.heap.items() if nid not in recovered_ids]
+        stack += [rid for start, rid in recovered if start in seen]
+        reach = set(stack)
+        while stack:
+            node = self.heap.get(stack.pop(), {})
+            vals = list((node.get("fields") or {}).values()) + list(node.get("items") or [])
+            for v in vals:
+                if isinstance(v, dict) and v.get("kind") == "ref" and v["id"] not in reach:
+                    reach.add(v["id"])
+                    stack.append(v["id"])
+        for rid in recovered_ids:
+            if rid not in reach and rid in self.heap:
+                self.heap[rid]["orphan"] = True
 
     # -- scalars and pointers
     def value(self, v, depth):
@@ -261,6 +418,9 @@ class Encoder:
         if code == gdb.TYPE_CODE_PTR:
             return self.pointer(v, t, tname, depth)
         if code == gdb.TYPE_CODE_STRUCT and tname == "std::string":
+            if self.buffer_released(v, "std::string"):          # its heap buffer was freed: never read it
+                return {"kind": "opaque", "type": "std::string (buffer released)"}
+            self.own(v)
             text = v.format_string(max_elements=200)
             if text.startswith('"'):
                 end = text.rfind('"')
@@ -282,13 +442,24 @@ class Encoder:
         target = t.target().strip_typedefs()
         tcode = target.code
         if tcode == gdb.TYPE_CODE_INT and str(target.unqualified()) == "char":
+            rec = ALLOCS.find(addr)
+            if rec is not None and not rec["freed"]:
+                self.owned.add(rec["start"])
             try:
-                text = v.string(length=200, errors="replace")
-                more = False
-                try:
-                    more = v.string(length=201, errors="replace") != text
-                except gdb.error:
-                    pass
+                # gdb's string(length=N) ignores NUL and always reads N bytes: read bytes ourselves and stop at the first NUL.
+                inf = gdb.selected_inferior()
+                raw = b""
+                for chunk in (201, 64, 16, 1):
+                    try:
+                        raw = bytes(inf.read_memory(addr, chunk))
+                        break
+                    except gdb.error:
+                        continue
+                if not raw:
+                    raise gdb.error("unreadable")
+                nul = raw.find(b"\0")
+                more = nul < 0 and len(raw) > 200
+                text = (raw[:nul] if nul >= 0 else raw[:200]).decode("utf-8", errors="replace")
                 return {"kind": "scalar", "type": tname, "value": text, "truncated": more}
             except gdb.error:
                 return {"kind": "opaque", "type": tname + " (unreadable string)"}
@@ -326,6 +497,10 @@ class Encoder:
                 if rec["kind"] == "array" or n > 1:
                     count = n
             storage = "heap"
+            self.seen.add(rec["start"])
+            if t.code != gdb.TYPE_CODE_VOID and (addr == rec["start"] or count is not None):
+                if rec["serial"] not in KNOWN_TYPES or addr == rec["start"]:
+                    KNOWN_TYPES[rec["serial"]] = t   # remembered so the block can still be drawn if it is later orphaned
             key = ("h", rec["serial"], addr - rec["start"], str(t))
         elif storage == "stack":
             key = ("s", self.owner(addr), addr, str(t))
@@ -357,7 +532,42 @@ class Encoder:
             t = val.type.strip_typedefs()
             code = t.code
             tname = pretty(str(t.unqualified()))
+            if tname.startswith(("std::unique_ptr<", "std::shared_ptr<", "std::weak_ptr<")) and printer_for(val) is not None:
+                self.own(val)
+                for _, child in printer_for(val).children():     # the one managed pointer
+                    node["fields"] = {"get()": self.value(child, depth)}
+                    break
+                else:
+                    node["fields"] = {"get()": {"kind": "scalar", "type": "pointer", "value": None}}
+                return
+            base_name = tname.split("<", 1)[0]
+            if base_name in LIB_MAPS | LIB_SEQS and printer_for(val) is not None:
+                if self.buffer_released(val, base_name):
+                    node["opaque"], node["type"] = True, tname + " (buffer released)"
+                    return
+                self.own(val)
+                pr = printer_for(val)
+                kids = []
+                for i, (_, child) in enumerate(pr.children()):
+                    if i >= (2 if base_name in LIB_MAPS else 1) * MAX_ITEMS:
+                        node["truncated"] = True
+                        self.truncated.append("items")
+                        break
+                    kids.append(child)
+                if base_name in LIB_MAPS:
+                    node["type"] = "dict"
+                    node["entries"] = [[self.value(kids[i], depth), self.value(kids[i + 1], depth)] for i in range(0, len(kids) - 1, 2)]
+                    node["length"] = len(node["entries"])
+                else:
+                    node["type"], node["element_type"] = base_name, first_template_arg(tname[len(base_name) + 1:-1])
+                    node["items"] = [self.value(c, depth) for c in kids]
+                    node["length"] = len(kids)
+                return
             if tname.startswith("std::vector<") and printer_for(val) is not None:
+                if self.buffer_released(val, "std::vector"):     # backing buffer freed: reading elements would show garbage
+                    node["opaque"], node["type"] = True, tname + " (buffer released)"
+                    return
+                self.own(val)
                 # experimental: elements come from libstdc++'s own gdb printer
                 children = []
                 for i, (_, child) in enumerate(printer_for(val).children()):
@@ -393,6 +603,7 @@ class Encoder:
                     self.truncated.append("items")
             elif code in (gdb.TYPE_CODE_STRUCT, gdb.TYPE_CODE_UNION):
                 if tname.startswith("std::"):
+                    self.own(val)
                     node["opaque"] = True
                     return
                 node["fields"] = {}
@@ -483,6 +694,8 @@ def frame_bindings(frame, visited):
             if sym.is_variable and sym.line and sym.addr_class != gdb.SYMBOL_LOC_STATIC and (
                     sym.line > line or (sym.line == line and line not in visited)):
                 continue  # declared further down: its memory is not initialised yet
+            if sym.is_variable and sym.line and sym.addr_class != gdb.SYMBOL_LOC_STATIC and sym.line < line and visited and max(visited) < sym.line:
+                continue  # an early return skipped its declaration (the stop is reported at the closing brace): never set in this call
             seen.add(n)
             decl.append((n, sym))
             try:
@@ -509,6 +722,13 @@ def short_name(name):
     return name
 
 
+def _function_block(sym):
+    blk = gdb.block_for_pc(int(sym.value().address.cast(gdb.lookup_type("unsigned long"))))
+    while blk is not None and blk.function is None:
+        blk = blk.superblock
+    return blk if blk is not None else []
+
+
 def global_bindings(frame):
     out = []
     try:
@@ -517,6 +737,14 @@ def global_bindings(frame):
             for sym in blk:
                 if sym.is_variable and sym.symtab is not None and os.path.realpath(sym.symtab.fullname()) == SRC:
                     out.append((sym.print_name, sym.value()))
+                elif sym.is_function and sym.symtab is not None and os.path.realpath(sym.symtab.fullname()) == SRC:
+                    # `static` variables inside functions live for the whole run, so they are roots even while the function is not running
+                    try:
+                        for inner in _function_block(sym):
+                            if inner.is_variable and inner.addr_class == gdb.SYMBOL_LOC_STATIC:
+                                out.append((sym.print_name + "::" + inner.print_name, inner.value()))
+                    except (gdb.error, RuntimeError, AttributeError):
+                        pass
     except (gdb.error, RuntimeError):
         pass
     return out
@@ -586,12 +814,45 @@ def alive():
         return False
 
 
+def covered_blocks(heap, owned=()):
+    covered = set(owned)
+    for node in heap.values():
+        addr = node.get("address")
+        if node.get("storage") == "heap" and addr:
+            try:
+                rec = ALLOCS.find(int(addr, 16))
+            except (TypeError, ValueError):
+                continue
+            if rec is not None:
+                covered.add(rec["start"])
+    return covered
+
+
+def unreached_blocks(heap, owned=()):
+    """Live heap blocks the program allocated that no captured object covers.
+
+    These are blocks the program still owns but this snapshot did not draw: memory only reachable through freed
+    memory, buffers owned by library objects (std::string, std::vector contents), or anything outside the capture
+    limits. It is a count, not a diagnosis, so it can only say "the diagram does not cover all live memory".
+    """
+    covered = covered_blocks(heap, owned)
+    count = size = 0
+    for start, rec in ALLOCS.by_start.items():
+        if not rec["freed"] and start not in covered:
+            count += 1
+            size += rec["size"]
+    return {"count": count, "bytes": size}
+
+
 def emit(kind, chain, extra=None, ret=None):
     OUT.poll()
     frames = capture_state(chain, ret)
     ev = {"step": STATE["step"], "event": kind, "line": frames[-1]["line"], "frames": frames,
           "heap": ENC.heap, "stdout": OUT.text["stdout"], "stderr": OUT.text["stderr"],
           "truncated": sorted(set(ENC.truncated))}
+    unreached = unreached_blocks(ENC.heap, ENC.owned)
+    if unreached["count"]:
+        ev["unreached_heap"] = unreached
     if extra:
         ev.update(extra)
     if ret is not None:
@@ -856,6 +1117,11 @@ def run():
         finish(stop.status, **stop.extra)
     except SystemExit:
         raise
+    except OSError as exc:
+        if getattr(exc, "errno", None) == errno.EFBIG:   # the recording file hit its size limit: a limit, not a tracer bug
+            finish("trace_limit", limit="file")
+        else:
+            finish("worker_error", error={"type": type(exc).__name__}, detail=str(exc)[:300])
     except BaseException as exc:  # a tracer bug must show up as worker_error, not as a user error
         finish("worker_error", error={"type": type(exc).__name__}, detail=str(exc)[:300])
 
