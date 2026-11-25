@@ -6,6 +6,7 @@ import { Replay } from './components/Replay';
 import { RunPanel } from './components/RunPanel';
 import type { Language, RunInfo } from './components/RunPanel';
 import { SHARE_NOTICE, buildSessionHtml, readEmbeddedSession, sessionFileName } from './session';
+import { GZIP_EXT, gunzipText, gzipSupported, gzipText, isGzip } from './gzip';
 import { MAX_WATCHES, parseWatch } from './watch';
 
 // Set when this page is an exported session file: the trace is already inside the page.
@@ -38,7 +39,7 @@ export function App() {
   const start = useRef(initial()).current;
   const [trace, setTrace] = useState<Trace | null>(start.trace), [name, setName] = useState(embedded ? 'Shared session' : '');
   const [error, setError] = useState(start.error), [notice, setNotice] = useState(''), [dark, setDark] = useState(true), [busy, setBusy] = useState(false);
-  const revision = useRef(0), [loaded, setLoaded] = useState(0);
+  const revision = useRef(0), rawText = useRef(''), [loaded, setLoaded] = useState(0);
   // M4 state that outlives one recording: the editor draft, breakpoints and watches.
   const [editorOpen, setEditorOpen] = useState(true), [draft, setDraft] = useState(readDraft), [ranSource, setRanSource] = useState<string | null>(null), [runStats, setRunStats] = useState('');
   const [breakpoints, setBreakpoints] = useState<ReadonlySet<number>>(new Set()), [watches, setWatches] = useState<string[]>([]);
@@ -55,7 +56,7 @@ export function App() {
     if (id !== revision.current) return;
     try {
       const t0 = performance.now(), next = parseTrace(raw), ms = performance.now() - t0;
-      setTrace(next); setName(label); setLoaded(id); setRanSource(fromRun ? next.source : null); if (fromRun) { setEditorOpen(false); const go = () => (document.querySelector('.replay-root') ?? document.getElementById('replay'))?.scrollIntoView({ block: 'start' }); setTimeout(go, 150); setTimeout(go, 700); } // after a run, the editor folds away so the replay fits the screen
+      rawText.current = raw; setTrace(next); setName(label); setLoaded(id); setRanSource(fromRun ? next.source : null); if (fromRun) { setEditorOpen(false); const go = () => (document.querySelector('.replay-root') ?? document.getElementById('replay'))?.scrollIntoView({ block: 'start' }); setTimeout(go, 150); setTimeout(go, 700); } // after a run, the editor folds away so the replay fits the screen
       setRunStats(`${next.events.length.toLocaleString()} events validated in ${Math.max(1, Math.round(ms))} ms`);
       if (!fromRun) setBreakpoints(new Set()); // a different program: old line numbers mean nothing
     }
@@ -67,7 +68,15 @@ export function App() {
     if (!file) return;
     const id = begin();
     if (file.size > MAX_BYTES) { setError('File is larger than the 20 MiB replay limit.'); setBusy(false); return; }
-    try { accept(await file.text(), file.name, id); }
+    try {
+      const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+      if (isGzip(head)) {
+        let text: string;
+        try { text = await gunzipText(new Uint8Array(await file.arrayBuffer()), MAX_BYTES); }
+        catch (err) { if (id === revision.current) { setError(err instanceof Error ? err.message : 'Could not open this .gz file.'); setBusy(false); } return; }
+        accept(text, file.name, id);
+      } else accept(await file.text(), file.name, id);
+    }
     catch { if (id === revision.current) { setError('Could not read this file.'); setBusy(false); } }
   }
   async function example(file: string) {
@@ -111,11 +120,23 @@ export function App() {
       setNotice(`Exported ${sessionFileName(name)}. ${SHARE_NOTICE}`);
     } catch { setError('Could not build the session file. Use npm run dev, or npm run build then npm run preview.'); }
   }
+  // Saves the exact text that was validated and shown (no re-serialising), gzip-compressed.
+  async function saveGz() {
+    if (!trace || !rawText.current) return;
+    setNotice('');
+    try {
+      const blob = await gzipText(rawText.current), fileName = sessionFileName(name).replace(/\.session\.html$/, GZIP_EXT);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setNotice(`Saved ${fileName} (${(blob.size / 1048576).toFixed(2)} MiB, from ${(rawText.current.length / 1048576).toFixed(2)} MiB). ${SHARE_NOTICE}`);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not compress this recording.'); }
+  }
   const stale = trace && ranSource !== null && ranSource !== draft.source;
   return <main data-theme={dark ? 'dark' : 'light'}><div className="app-shell"><header><div><p className="eyebrow">CODE VISUALIZER / {embedded ? 'SHARED SESSION' : 'MILESTONE 5'}</p><h1>Execution, one step at a time.</h1><p className="subtitle">{embedded ? 'An exported recording. It replays offline and never runs code.' : 'Write Python or C++, record a run on this computer, then step through it with breakpoints and watches.'}</p></div><button onClick={() => setDark(!dark)}>{dark ? 'Light mode' : 'Dark mode'}</button></header>
     {!embedded && <RunPanel collapsed={!!trace && !editorOpen} onToggleCollapsed={trace ? () => setEditorOpen((o) => !o) : undefined} source={draft.source} stdin={draft.stdin} onSource={(source) => setDraft((d) => ({ ...d, source }))} onStdin={(stdin) => setDraft((d) => ({ ...d, stdin }))} language={draft.language} onLanguage={(language) => setDraft((d) => ({ ...d, language, source: d.source.trim() === '' || d.source === STARTERS[d.language] ? STARTERS[language] : d.source }))} onResult={runResult}/>}
-    {!embedded && <section className="loader" aria-label="Load recording"><label className="file-label">Open trace JSON<input type="file" accept=".json,application/json" onChange={upload}/></label><label className="example-label">Or explore a fixture<select aria-label="Example trace" value="" onChange={(e) => void example(e.target.value)}><option value="">Choose example...</option>{examples.map((file) => <option key={file} value={file}>{file.replaceAll('_', ' ')}</option>)}</select></label><span className="hint">Saved recordings replay without the backend. Local files stay in this browser. Up to 20 MiB / 10,000 events.</span></section>}
+    {!embedded && <section className="loader" aria-label="Load recording"><label className="file-label">Open trace JSON<input type="file" accept=".json,.gz,application/json,application/gzip" onChange={upload}/></label><label className="example-label">Or explore a fixture<select aria-label="Example trace" value="" onChange={(e) => void example(e.target.value)}><option value="">Choose example...</option>{examples.map((file) => <option key={file} value={file}>{file.replaceAll('_', ' ')}</option>)}</select></label><span className="hint">Saved recordings replay without the backend. Local files stay in this browser. Up to 20 MiB unpacked / 10,000 events; .json and .json.gz.</span></section>}
     {busy && <p role="status">Reading trace...</p>}{error && <div className="error" role="alert"><b>Could not load trace</b><p>{error}</p>{trace && <small>The previous recording is still loaded.</small>}</div>}
-    <div id="replay">{trace ? <><div className="recording-name">{name}{!embedded && <> <button className="export" onClick={() => void exportSession()}>Export session (.html)</button></>}</div>{embedded && <p className="hint" data-testid="share-notice">{SHARE_NOTICE}</p>}{!embedded && <p className="hint">{SHARE_NOTICE}</p>}{runStats && <p className="hint" data-testid="load-stats">{runStats}.</p>}{stale && <p className="warning" data-testid="stale-note">The editor has changed since this recording. Press Run and record to update it.</p>}{notice && <p role="status" data-testid="export-notice">{notice}</p>}<Replay trace={trace} key={loaded} breakpoints={breakpoints} onToggleBreakpoint={toggleBreakpoint} watches={watches} onAddWatch={addWatch} onRemoveWatch={removeWatch}/></> : <section className="welcome"><span className="welcome-number">01 → 02 → 03</span><h2>Record a run, then replay it.</h2><p>Press Run and record on the program above, or start with the alias fixture: two variables, one list.</p><button className="primary" onClick={() => void example('05_alias')}>Explore alias example</button><p className="hint">A line snapshot is captured before the highlighted line executes.</p></section>}</div>
+    <div id="replay">{trace ? <><div className="recording-name">{name}{!embedded && <> <button className="export" onClick={() => void exportSession()}>Export session (.html)</button>{gzipSupported() && <> <button className="export" onClick={() => void saveGz()}>Save recording (.json.gz)</button></>}</>}</div>{embedded && <p className="hint" data-testid="share-notice">{SHARE_NOTICE}</p>}{!embedded && <p className="hint">{SHARE_NOTICE}</p>}{runStats && <p className="hint" data-testid="load-stats">{runStats}.</p>}{stale && <p className="warning" data-testid="stale-note">The editor has changed since this recording. Press Run and record to update it.</p>}{notice && <p role="status" data-testid="export-notice">{notice}</p>}<Replay trace={trace} key={loaded} breakpoints={breakpoints} onToggleBreakpoint={toggleBreakpoint} watches={watches} onAddWatch={addWatch} onRemoveWatch={removeWatch}/></> : <section className="welcome"><span className="welcome-number">01 → 02 → 03</span><h2>Record a run, then replay it.</h2><p>Press Run and record on the program above, or start with the alias fixture: two variables, one list.</p><button className="primary" onClick={() => void example('05_alias')}>Explore alias example</button><p className="hint">A line snapshot is captured before the highlighted line executes.</p></section>}</div>
     <footer>Trace v1.0 (Python and C++) · Local backend + file-based replay · Breakpoints and watches read recorded events · Source and output are displayed as text</footer></div></main>;
 }
