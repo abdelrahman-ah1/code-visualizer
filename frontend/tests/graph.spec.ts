@@ -36,7 +36,7 @@ test('every captured object is drawn, with pointer arrows, and zoom/pan work', a
   const boxes = await page.locator('[data-testid^="box-"]').count();
   expect(boxes).toBeGreaterThanOrEqual(3);
   expect(await page.getByText(/Not drawn here/).count()).toBe(0);
-  expect(await page.locator('.card-box').count()).toBeGreaterThan(0);
+  expect(await page.locator('.node-box').count()).toBeGreaterThan(0);
   expect(await page.locator('svg[data-testid=structure-svg] path.arrow').count()).toBeGreaterThan(0);
   await page.waitForFunction(() => document.getAnimations().filter(a => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity).length === 0);
   await page.waitForTimeout(300);
@@ -118,13 +118,13 @@ int main() {
   await page.getByRole('button', { name: 'Last', exact: true }).click();
   await page.waitForTimeout(600);
   await page.getByRole('button', { name: '100%', exact: true }).click();
-  const t = await page.locator('.card-row text').allTextContents();
+  const t = await page.locator('.node-main, [data-testid=data-line]').allTextContents();
   expect(t.some((x) => x.includes('…'))).toBe(true);
-  const titles = await page.locator('.card-row title').allTextContents();
+  const titles = await page.locator('.node-main title, [data-testid=data-line] title').allTextContents();
   const full = titles.find((x) => x.startsWith('total_entries: '))!;
   console.log('TOOLTIP', JSON.stringify(titles));
   expect(full).toBe(`total_entries: ${obj.fields.total_entries.value}`);   // tooltip == captured value, complete
   expect(obj.fields.total_entries.truncated).toBeFalsy();                     // capture itself was not cut
-  await page.locator('.card-row').first().hover({ force: true });
+  await page.locator('.node-main').first().hover({ force: true });
   await page.screenshot({ path: `${SHOTS}/graph-1366-truncation.png` });
 });
