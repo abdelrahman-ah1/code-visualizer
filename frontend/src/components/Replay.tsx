@@ -6,7 +6,7 @@ import { Controls } from './Controls';
 import { Source } from './Source';
 import { CallStack, Heap } from './Memory';
 import { Structures } from './Structures';
-import { buildScenes } from '../structures';
+import { sceneCache } from '../structures';
 import { ValueView } from './ValueView';
 import { Watch } from './Watch';
 import { Diagnostics } from './Diagnostics';
@@ -20,7 +20,9 @@ export function Replay({ trace, breakpoints, onToggleBreakpoint, watches, onAddW
   const stops = useMemo(() => stopIndexes(lineIndex, breakpoints), [lineIndex, breakpoints]);
   const unreached = useMemo(() => unreachedLines(lineIndex, breakpoints), [lineIndex, breakpoints]);
   const p = usePlayback(trace.events.length, stops), event = trace.events[p.index];
-  const scenes = useMemo(() => buildScenes(trace), [trace]);
+  const scenes = useMemo(() => sceneCache(trace), [trace]);
+  // Build the rest in small slices while the user looks at the first steps, so a far seek stays cheap and the page never stalls.
+  useEffect(() => { let t = 0; const tick = () => { try { if (!scenes.step(25)) t = window.setTimeout(tick, 0); } catch { /* the same error shows when that step is drawn */ } }; t = window.setTimeout(tick, 50); return () => window.clearTimeout(t); }, [scenes]);
   const lines = useMemo(() => trace.source.split('\n'), [trace.source]);
   const [tab, setTab] = useState<TabId | 'closed' | null>(null);
   useEffect(() => setTab(null), [trace]);
@@ -43,7 +45,7 @@ export function Replay({ trace, breakpoints, onToggleBreakpoint, watches, onAddW
         </section>
       </div>
       <div className={`col-right ${shown === 'closed' ? 'closed' : ''}`}>
-        {event && <Structures nullWord={/g\+\+|gcc|clang|c\+\+/i.test(trace.runtime.implementation) ? 'null' : 'None'} scene={scenes[p.index]} event={event} prev={trace.events[p.index - 1]} prevScene={scenes[p.index - 1]}/>}
+        {event && <Structures nullWord={/g\+\+|gcc|clang|c\+\+/i.test(trace.runtime.implementation) ? 'null' : 'None'} scene={scenes.get(p.index)} event={event} prev={trace.events[p.index - 1]} prevScene={scenes.get(p.index - 1)}/>}
         <section className="panel tabs-panel" aria-label="Details">
           <div className="tabs" role="tablist" aria-label="Details panels">
             {TABS.map((t) => <button type="button" role="tab" key={t.id} id={`tab-${t.id}`} aria-selected={shown === t.id} aria-controls="tabpanel" className={`tab ${shown === t.id ? 'on' : ''}`} onClick={() => setTab(shown === t.id ? 'closed' : t.id)}>{t.label}{t.id === 'findings' && found > 0 && <span className="badge" aria-label={`${found} errors`}>{found}</span>}</button>)}
