@@ -70,6 +70,20 @@ class Supported(unittest.TestCase):
         self.assertEqual(names.count("swap_first_two"), 1)
         self.assertEqual(len([e for e in r["events"] if e["event"] == "return"]), 5)  # 3 + 1 + main
 
+    def test_huffman_slow_recording_has_neutral_incomplete_message(self):
+        # priority_queue program: about 280 steps, needs more than 2 s on a typical machine.
+        short = run("huffman_priority_queue", timeout=0.6, max_events=2000)
+        self.assertEqual(short["status"], "timeout")
+        msg = [d["message"] for d in short["diagnostics"] if d["kind"] == "timeout"][0]
+        self.assertIn("capture is incomplete", msg)
+        self.assertNotIn("endless loop", msg)
+        self.assertNotIn("probably", msg)
+        # The memory check is a separate whole-run check, so the leak is still reported.
+        self.assertIn("memory-leak", kinds(short))
+        full = run("huffman_priority_queue", timeout=10.0, max_events=2000)
+        self.assertEqual((full["status"], full["complete"]), ("ok", True))
+        self.assertGreater(len(full["events"]), 200)
+
     def test_all_nodes_freed_at_end_means_no_leak_finding(self):
         r = cpp_trace.capture_cpp((ROOT / "backend" / "cpp_examples" / "01_linked_list_swap.cpp").read_text(encoding="utf-8"))
         self.assertNotIn("memory-leak", kinds(r))
