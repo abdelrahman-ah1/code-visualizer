@@ -1,6 +1,6 @@
 import { memo, useMemo, useRef, useState } from 'react';
 import type { TraceEvent } from '../types';
-import { CARD, GEOM, REC, arrayOmitted, cardRows, portY, cellCentre, changedBetween, fmt, laneSummary, linkFieldsByType, linkPath, recGeom } from '../structures';
+import { CARD, GEOM, REC, arrayOmitted, cardRows, portY, cellCentre, changedBetween, fmt, laneSummary, linkFieldsByType, linkPath, recGeom, graphSpec, vertexCutOff, vertexDisplay, vertexEdges } from '../structures';
 import type { Scene } from '../structures';
 import type { Value } from '../types';
 
@@ -66,6 +66,28 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
       {arrows}
     </g>;
   };
+  const gs = useMemo(() => graphSpec(event), [event]);
+  // A graph vertex: a rounded card with its plain values. Its pointer fields and neighbour list are the arrows (one-way edges have one head,
+  // two vertices that point at each other share a line with two heads). The title lists every edge and the list it came from.
+  const renderVertex = (id: string, b: Scene['boxes'][string], node: TraceEvent['heap'][string], tag: string[] | undefined, m: string) => {
+    const cut = vertexCutOff(event.heap, id, gs), d = vertexDisplay(node), listFields = gs.edgeFields.get(node.type) ?? [], out = vertexEdges(event.heap, id, gs);
+    const via = listFields.map((f) => { const v = node.fields?.[f]; return v?.kind === 'ref' ? `${f} = ${v.id}` : ''; }).filter(Boolean).join(', ');
+    const mainY = d.rest.length + (d.more > 0 ? 1 : 0) + (cut > 0 ? 1 : 0) === 0 ? b.h / 2 + 5 : 22;
+    const fv = (v: Value) => (v.kind === 'scalar' && v.value === null ? nullWord : fmt(v, 8));
+    return <g key={id} className="vnode vertex" data-testid={`box-${id}`} data-x={b.x} data-y={b.y} style={{ transform: `translate(${b.x}px, ${b.y}px)` }}>
+      <title>{`${node.type} ${id}${node.address ? ` at ${node.address}` : ''}: ${out.length ? `edges to ${out.join(', ')}` : 'no edges'}${via ? ` (neighbour list ${via})` : ''}${cut ? `; ${cut} neighbour-list items not captured` : ''}`}</title>
+      {tag && <Tag names={tag}/>}
+      <g key={m ? `${m}${event.step}` : 's'} className={m}>
+        <rect className={`node-box vertex-box${node.orphan ? ' orphan' : ''}`} width={b.w} height={b.h} rx="16"/>
+        {d.main && <text className="node-main" x={b.w / 2} y={mainY} textAnchor="middle"><title>{`${d.main[0]}: ${String(d.main[1].kind === 'scalar' ? d.main[1].value : '')}`}</title>{clipText(fmt(d.main[1], 8), 8)}</text>}
+        {d.rest.map(([k, v], i) => <text className="node-rest" key={k} x={b.w / 2} y={mainY + 15 + i * REC.line} textAnchor="middle" data-testid="data-line">{`${clipText(k, 7)}: ${clipText(fv(v), 7)}`}</text>)}
+        {d.more > 0 && <text className="node-rest" x={b.w / 2} y={mainY + 15 + d.rest.length * REC.line} textAnchor="middle">{`+${d.more} more`}</text>}
+        {cut > 0 && <text className="node-rest" x={b.w / 2} y={mainY + 15 + (d.rest.length + (d.more > 0 ? 1 : 0)) * REC.line} textAnchor="middle" data-testid="edges-cut"><title>{`${cut} neighbour-list item${cut === 1 ? '' : 's'} not captured by the recording`}</title>{`${cut} edge${cut === 1 ? '' : 's'} not captured`}</text>}
+      </g>
+      <text className="node-id" x="9" y="12">{id}</text>
+      {linksFrom(id).map((l) => { const p = linkPath(l, scene.boxes); return p && <g key={`g>${l.to}`} data-testid={`edge-${l.from}-${l.to}`}><path className="arrow" d={p} markerEnd="url(#cv-arrowhead)" markerStart={l.both ? 'url(#cv-arrowhead)' : undefined}/>{l.label && l.mid && <text className="edge-label" x={l.mid.x} y={l.mid.y - 4} textAnchor="middle">{l.label}</text>}</g>; })}
+    </g>;
+  };
   return <section className="panel structures" aria-label="Structures">
     <div className="structures-head"><h2>Structures <small>every captured object: lists, arrays, and object cards</small></h2>
       <div className="zoom-bar" role="group" aria-label="Zoom and pan the diagram">
@@ -79,9 +101,10 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
       onPointerMove={(e) => { const d = drag.current; if (d && box.current && e.buttons === 1) box.current.scrollTo({ left: d.l - (e.clientX - d.x), top: d.t - (e.clientY - d.y) }); }}
       onPointerUp={() => { drag.current = null; }} onPointerLeave={() => { drag.current = null; }}>
       <svg width={Math.ceil(scene.width * zoom)} height={Math.ceil(scene.height * zoom)} viewBox={`0 0 ${scene.width} ${scene.height}`} role="img" aria-label={summaries.join('. ')} data-testid="structure-svg" data-zoom={zoom}>
-        <defs><marker id="cv-arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" className="arrowhead"/></marker></defs>
+        <defs><marker id="cv-arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" className="arrowhead"/></marker></defs>
         {scene.cards.map((id) => {
           const b = scene.boxes[id], node = event.heap[id], tag = scene.tags[id], m = mark(id);
+          if (b.vertex) return renderVertex(id, b, node, tag, m);
           if (b.rec) return renderRecord(id, b, node, tag, m);
           const rows = cardRows(node);
           return <g key={id} className="vnode" data-testid={`box-${id}`} data-x={b.x} data-y={b.y} style={{ transform: `translate(${b.x}px, ${b.y}px)` }}>
