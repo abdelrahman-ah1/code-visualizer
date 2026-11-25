@@ -31,3 +31,12 @@ it('rejects a bad freed flag and bad exit_code', () => {
   const bad = JSON.parse(JSON.stringify(t)); bad.exit_code = 'x';
   expect(() => parseTrace(JSON.stringify(bad))).toThrow();
 });
+it('accepts and validates the optional unreached_heap note', () => {
+  const t = load('cpp_01_linked_list_swap');
+  t.events[0].unreached_heap = { count: 2, bytes: 96 };
+  expect(parseTrace(JSON.stringify(t)).events[0].unreached_heap).toEqual({ count: 2, bytes: 96 });
+  t.events[0].unreached_heap = { count: 'x', bytes: 1 };
+  expect(() => parseTrace(JSON.stringify(t))).toThrow();
+  t.events[0].unreached_heap = { count: 1.5, bytes: 1 };
+  expect(() => parseTrace(JSON.stringify(t))).toThrow();
+});
