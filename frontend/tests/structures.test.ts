@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseTrace } from '../src/parseTrace';
-import { buildScenes, changedBetween, laneSummary, linkPath, GEOM } from '../src/structures';
+import { sceneCache, buildScenes, changedBetween, laneSummary, linkPath, GEOM } from '../src/structures';
 const load = (name: string) => parseTrace(readFileSync(new URL(`../public/examples/${name}.trace.json`, import.meta.url), 'utf8'));
 const lanes = (name: string) => { const t = load(name), s = buildScenes(t); return t.events.map((e, i) => s[i].lanes.map((l) => laneSummary(l, e, s[i]))); };
 const last = <T,>(a: T[]) => a[a.length - 1];
@@ -135,5 +135,19 @@ describe('change detection', () => {
     expect(sawAdded && sawChanged).toBe(true);
     expect(changedBetween(undefined, t.events[0]).changed.size).toBe(0);
     expect(changedBetween(t.events[3], t.events[3])).toEqual({ changed: new Set(), added: new Set() });
+  });
+});
+
+describe('sceneCache', () => {
+  it('gives exactly the scenes buildScenes gives, whatever order they are asked for (far seek first, then back, then the slices)', () => {
+    for (const name of ['12_linked_list_insert', '07_cycle', '13_empty_and_single']) {
+      const t = load(name), all = buildScenes(t), c = sceneCache(t), n = t.events.length;
+      expect(JSON.stringify(c.get(n - 1))).toBe(JSON.stringify(all[n - 1]));      // a far seek builds everything before it, in order
+      expect(c.built()).toBe(n);
+      for (let i = n - 1; i >= 0; i--) expect(JSON.stringify(c.get(i))).toBe(JSON.stringify(all[i]));
+      const d = sceneCache(t); let done = false; while (!done) done = d.step(2);
+      expect(d.built()).toBe(n);
+      for (let i = 0; i < n; i++) expect(JSON.stringify(d.get(i))).toBe(JSON.stringify(all[i]));
+    }
   });
 });
