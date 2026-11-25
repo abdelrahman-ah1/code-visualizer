@@ -227,3 +227,4 @@ main[data-theme=light] .bp-hit { color:#a01628; }
 .ptr-name { fill:var(--muted); font:9.5px 'SFMono-Regular',Consolas,monospace; }
 .ptr-strip { stroke-width:1; }
 .node-box.orphan { stroke:#e0a030; stroke-dasharray:5 3; }
+.edge-label { fill:var(--muted); font:10px 'SFMono-Regular',Consolas,monospace; paint-order:stroke; stroke:var(--panel,#10171c); stroke-width:3px; }

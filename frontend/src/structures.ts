@@ -4,14 +4,18 @@
 // arrays, (b) which "lane" (row) each structure sits in, and (c) where every box goes.
 // Trace snapshots are never changed. Layout lives only in the Scene objects built here.
 import type { HeapNode, Trace, TraceEvent, Value } from './types';
+import { layeredLayout, stabilize } from './graphlayout';
 
 export const GEOM = { nodeW: 124, nodeH: 56, gap: 52, cell: 46, pad: 28, tagH: 34, belowH: 56 };
 export const LANE_H = GEOM.tagH + GEOM.nodeH + GEOM.belowH;
 const POCKET = 15; // distance from a node's right edge to the centre of its link dot
 
-export interface Box { id: string; kind: 'node' | 'array' | 'card'; x: number; y: number; w: number; h: number; lane: number; mainH?: number; rec?: boolean }
+export interface Box { id: string; kind: 'node' | 'array' | 'card'; x: number; y: number; w: number; h: number; lane: number; mainH?: number; rec?: boolean; vertex?: boolean }
 // An arrow from one box (and, for arrays, one cell) to another drawn box.
-export interface Link { from: string; cell?: number; to: string; port?: { x: number; y: number } }
+export interface Link { from: string; cell?: number; to: string; port?: { x: number; y: number };
+  // M6 graph edges: a finished path (in the source box's coordinates), whether the line has a head at both ends
+  // (the two vertices point at each other), and a multiplicity label when the same edge is stored more than once.
+  d?: string; both?: boolean; label?: string; mid?: { x: number; y: number } }
 // General object card: every captured object that is not a list node or array is drawn as a card of rows.
 export const CARD = { w: 138, head: 25, row: 16, pad: 5, gap: 16 };
 export interface CardRow { label: string; value: Value | null; note?: string }
@@ -94,8 +98,10 @@ export function linkFieldsByType(heap: Record<string, HeapNode>): Map<string, st
   return out;
 }
 
-export interface LayoutState { laneOf: Map<string, number>; headOf: Map<number, string>; rank: Map<string, number> }
-export const newLayoutState = (): LayoutState => ({ laneOf: new Map(), headOf: new Map(), rank: new Map() });
+export interface LayoutState { laneOf: Map<string, number>; headOf: Map<number, string>; rank: Map<string, number>;
+  tx: Map<string, number>; gx: Map<string, number>; tOrigin?: number; gOrigin?: number }   // M6: remembered tree and graph x positions (slot units) by object id
+export const newLayoutState = (): LayoutState => ({ laneOf: new Map(), headOf: new Map(), rank: new Map(), tx: new Map(), gx: new Map() });
+export const cloneLayoutState = (st: LayoutState): LayoutState => ({ laneOf: new Map(st.laneOf), headOf: new Map(st.headOf), rank: new Map(st.rank), tx: new Map(st.tx), gx: new Map(st.gx), tOrigin: st.tOrigin, gOrigin: st.gOrigin });
 
 interface Structure { kind: 'list' | 'array'; ids: string[]; type: string; end?: SceneLane['end']; endTo?: string }
 
@@ -104,14 +110,106 @@ export const arrayOmitted = (n: HeapNode) => {
   return Math.max(0, (n.length ?? shown) - shown, n.truncated && (n.length ?? 0) <= shown ? 1 : 0);
 };
 
+// ---- M6 graph mode -------------------------------------------------------------------------------------------------
+// A type is drawn as graph vertices when one of its fields holds a neighbour list: a list/array that only this one field
+// points at and whose items are all objects of the same type (or null). Node.neighbors, Node.children, vector<Node*> adj.
+// The list itself is then not drawn as a box: its items become edges. It stays in the Heap panel, the vertex's tooltip names it, and a
+// variable that points at it gets its name pill on the owning vertex. A list that two objects share is never hidden (the type then
+// keeps the plain array/card view). Items the recording cut off are counted on the vertex, never dropped silently.
+export interface GraphSpec { vertices: string[]; collapsed: Map<string, { owner: string; field: string }>; edgeFields: Map<string, string[]> }
+export function graphSpec(event: TraceEvent): GraphSpec {
+  const heap = event.heap, refs = new Map<string, number>(), bump = (v: Value) => { if (v.kind === 'ref') refs.set(v.id, (refs.get(v.id) ?? 0) + 1); };
+  for (const n of Object.values(heap)) { Object.values(n.fields ?? {}).forEach(bump); (n.items ?? []).forEach(bump); (n.entries ?? []).forEach(([k, v]) => { bump(k); bump(v); }); }
+  const cand = new Map<string, { ok: boolean; any: boolean; arrs: [string, string][]; type: string; field: string }>();
+  for (const [nid, n] of Object.entries(heap)) {
+    if (!isRecord(n)) continue;
+    for (const [k, v] of Object.entries(n.fields!)) {
+      if (v.kind !== 'ref' || !heap[v.id] || !isArray(heap[v.id])) continue;
+      const arr = heap[v.id], key = `${n.type}\u0000${k}`, c = cand.get(key) ?? cand.set(key, { ok: true, any: false, arrs: [], type: n.type, field: k }).get(key)!;
+      const items = arr.items ?? [];
+      const good = refs.get(v.id) === 1 && items.every((x) => (x.kind === 'ref' && !!heap[x.id] && isRecord(heap[x.id]) && heap[x.id].type === n.type) || (x.kind === 'scalar' && x.value === null) || x.kind === 'truncated');
+      c.ok = c.ok && good; c.any = c.any || (good && items.some((x) => x.kind === 'ref')); c.arrs.push([v.id, nid]);
+    }
+  }
+  const edgeFields = new Map<string, string[]>(), collapsed = new Map<string, { owner: string; field: string }>();
+  for (const c of cand.values()) if (c.ok && c.any) { (edgeFields.get(c.type) ?? edgeFields.set(c.type, []).get(c.type)!).push(c.field); for (const [a, o] of c.arrs) collapsed.set(a, { owner: o, field: c.field }); }
+  const vertices = Object.keys(heap).filter((id) => isRecord(heap[id]) && edgeFields.has(heap[id].type));
+  return { vertices, collapsed, edgeFields };
+}
+const VERTEX = { w: 116, minH: 56, gapX: 44, gapY: 64 };
+const VERTEX_MAIN = ['value', 'val', 'data', 'key', 'name', 'label', 'id'];
+// What a vertex card shows: one main value, up to three other plain values. Pointer fields become the arrows.
+export function vertexDisplay(node: HeapNode) {
+  const data = Object.entries(node.fields ?? {}).filter(([, v]) => !isPointer(v) && v.kind !== 'ref');
+  const mi = Math.max(0, data.findIndex(([k, v]) => VERTEX_MAIN.includes(k) && v.kind === 'scalar'));
+  const main = data[mi] ?? null, restAll = data.filter((_, i) => i !== mi);
+  return { main, rest: restAll.slice(0, 3), more: restAll.length - Math.min(3, restAll.length) };
+}
+// Neighbour-list items the recording did not capture (cut off by the tracer's depth or length limits), summed over a vertex's lists.
+export function vertexCutOff(heap: Record<string, HeapNode>, id: string, spec: GraphSpec): number {
+  let n = 0;
+  for (const f of spec.edgeFields.get(heap[id].type) ?? []) { const v = heap[id].fields?.[f]; const arr = v?.kind === 'ref' ? heap[v.id] : undefined; if (arr) n += (arr.items ?? []).filter((x) => x.kind === 'truncated').length + arrayOmitted(arr); }
+  return n;
+}
+export const vertexHeight = (node: HeapNode, cut = 0) => { const d = vertexDisplay(node); return Math.max(VERTEX.minH, 30 + (d.rest.length + (d.more > 0 ? 1 : 0) + (cut > 0 ? 1 : 0)) * 13); };
+// Edges of one vertex, in field order: neighbour-list items first-to-last, then direct pointer fields to other vertices. Null slots are skipped.
+export function vertexEdges(heap: Record<string, HeapNode>, id: string, spec: GraphSpec): string[] {
+  const n = heap[id], out: string[] = [], listFields = new Set(spec.edgeFields.get(n.type) ?? []), vs = new Set(spec.vertices);
+  for (const [k, v] of Object.entries(n.fields ?? {})) {
+    if (v.kind !== 'ref') continue;
+    if (listFields.has(k)) { const arr = heap[v.id]; if (arr?.items) for (const x of arr.items) if (x.kind === 'ref' && vs.has(x.id)) out.push(x.id); }
+    else if (vs.has(v.id)) out.push(v.id);
+  }
+  return out;
+}
+// A pointer from a list cell, an object row or a record field into a graph vertex: out of the source, then down into the top of the vertex.
+// Returns null when that curve would cross another box, so the caller keeps the obstacle router's path for it instead.
+export function pointerToVertex(link: Link, boxes: Record<string, Box>): string | null {
+  const a = boxes[link.from], b = boxes[link.to]; if (!a || !b) return null;
+  const s: Pt = link.port ? { x: a.x + link.port.x, y: a.y + link.port.y } : a.kind === 'array' ? { x: a.x + cellCentre(link.cell ?? 0), y: a.y + a.h } : { x: a.x + a.w - POCKET, y: a.y + a.h };
+  const e: Pt = { x: b.x + b.w / 2 + 16, y: b.y - 3 }, side = !!link.port && s.x >= a.x + a.w - 14 ? 40 : 0;
+  const c1 = { x: s.x + side, y: s.y + (side ? 0 : 40) }, c2 = { x: e.x, y: e.y - 45 };
+  const pts = [...Array(33)].map((_, i) => { const t = i / 32, u = 1 - t; return { x: u * u * u * s.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * e.x, y: u * u * u * s.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * e.y }; });
+  if (Object.values(boxes).some((o) => o.id !== a.id && o.id !== b.id && pts.some((p) => inside(p, o, -3)))) return null;
+  if (e.y < s.y + 12) return null;   // the vertex is not below the source: leave it to the router
+  const L = (p: Pt) => `${Math.round((p.x - a.x) * 10) / 10} ${Math.round((p.y - a.y) * 10) / 10}`;
+  return `M ${L(s)} C ${L(c1)}, ${L(c2)}, ${L(e)}`;
+}
+const clipToBox = (b: Box, tx: number, ty: number, margin: number, shiftX = 0): Pt => {   // point on b's border towards (tx, ty), pushed out by margin
+  const cx = b.x + b.w / 2 + shiftX, cy = b.y + b.h / 2, dx = tx - cx, dy = ty - cy;
+  if (!dx && !dy) return { x: cx, y: b.y };
+  const t = Math.min(dx ? (b.w / 2 + margin) / Math.abs(dx) : Infinity, dy ? (b.h / 2 + margin) / Math.abs(dy) : Infinity);
+  return { x: cx + dx * t, y: cy + dy * t };
+};
+// A vertex-to-vertex edge: a straight line from border to border; when it would cross another box it bends (a quadratic curve) the
+// smallest amount that clears every box. If nothing clears, the straight line stays.
+export function edgePath(a: Box, b: Box, boxes: Box[], both: boolean): { d: string; mid: Pt } {
+  const ca = { x: a.x + a.w / 2, y: a.y + a.h / 2 }, cb = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+  const local = (p: Pt) => `${Math.round((p.x - a.x) * 10) / 10} ${Math.round((p.y - a.y) * 10) / 10}`;
+  const others = boxes.filter((o) => o.id !== a.id && o.id !== b.id);
+  const clear = (pts: Pt[]) => !others.some((o) => pts.some((p) => inside(p, o, -3)));
+  const s0 = clipToBox(a, cb.x, cb.y, both ? 3 : 1), e0 = clipToBox(b, ca.x, ca.y, 3, 16);   // arrows land a little right of centre, clear of the variable-name pill above a box's left side
+  const straight = [...Array(25)].map((_, i) => ({ x: s0.x + (e0.x - s0.x) * i / 24, y: s0.y + (e0.y - s0.y) * i / 24 }));
+  if (clear(straight)) return { d: `M ${local(s0)} L ${local(e0)}`, mid: { x: (s0.x + e0.x) / 2 - a.x, y: (s0.y + e0.y) / 2 - a.y } };
+  const len = Math.hypot(cb.x - ca.x, cb.y - ca.y) || 1, nx = -(cb.y - ca.y) / len, ny = (cb.x - ca.x) / len, mx = (ca.x + cb.x) / 2, my = (ca.y + cb.y) / 2;
+  for (const f of [0.18, -0.18, 0.3, -0.3, 0.45, -0.45, 0.65, -0.65]) {
+    const c = { x: mx + nx * len * f * 2, y: my + ny * len * f * 2 };   // control point; the curve passes about half that far out
+    const s = clipToBox(a, c.x, c.y, both ? 3 : 1), e = clipToBox(b, c.x, c.y, 3);
+    const pts = [...Array(25)].map((_, i) => { const t = i / 24, u = 1 - t; return { x: u * u * s.x + 2 * u * t * c.x + t * t * e.x, y: u * u * s.y + 2 * u * t * c.y + t * t * e.y }; });
+    if (clear(pts)) return { d: `M ${local(s)} Q ${local(c)} ${local(e)}`, mid: { x: pts[12].x - a.x, y: pts[12].y - a.y } };
+  }
+  return { d: `M ${local(s0)} L ${local(e0)}`, mid: { x: (s0.x + e0.x) / 2 - a.x, y: (s0.y + e0.y) / 2 - a.y } };
+}
+
 export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<number, number>, route = true): Scene {
   const heap = event.heap, ids = Object.keys(heap);
   // First-seen order keeps lane choice deterministic. IDs are encounter order, but we do not rely on that.
   for (const id of ids) if (!state.rank.has(id)) state.rank.set(id, state.rank.size);
   const rank = (id: string) => state.rank.get(id) ?? 0;
+  const gs = graphSpec(event), vertexSet = new Set(gs.vertices);
   const linkField = linkFieldsByType(heap);
   const field = (id: string) => linkField.get(heap[id].type);
-  const listNodes = ids.filter((id) => { const f = field(id); return !!f && !!heap[id].fields && Object.hasOwn(heap[id].fields!, f); });
+  const listNodes = ids.filter((id) => { const f = field(id); return !vertexSet.has(id) && !!f && !!heap[id].fields && Object.hasOwn(heap[id].fields!, f); });
   const succ = (id: string) => sameTypeRef(heap, heap[id], heap[id].fields?.[field(id)!]);
   const nullEnd = (id: string) => { const v = heap[id].fields?.[field(id)!]; return v?.kind === 'scalar' && v.value === null; };
 
@@ -135,7 +233,7 @@ export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<nu
   // Heads first (nothing points at them), then anything left over is a pure cycle.
   for (const id of listNodes.filter((n) => indeg.get(n) === 0).sort((a, b) => rank(a) - rank(b))) walk(id);
   for (const id of listNodes.slice().sort((a, b) => rank(a) - rank(b))) if (!seen.has(id)) walk(id);
-  for (const id of ids) if (isArray(heap[id])) structures.push({ kind: 'array', ids: [id], type: heap[id].type });
+  for (const id of ids) if (isArray(heap[id]) && !gs.collapsed.has(id)) structures.push({ kind: 'array', ids: [id], type: heap[id].type });
   // Arrays that hold pointers sit lowest, next to the objects they point at, so their arrows do not run across other arrays.
   // (An array whose pointers all lead to other arrays stays above them, so those arrows run downward.)
   const ptrMemo = new Map<Structure, number>();
@@ -185,7 +283,7 @@ export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<nu
   });
 
   const lanesH = Math.max(LANE_H, rowH.reduce((a, b) => a + b, 0)) + 12;
-  const cardIds = ids.filter((id) => !boxes[id]).sort((a, b) => rank(a) - rank(b));
+  const cardIds = ids.filter((id) => !boxes[id] && !vertexSet.has(id) && !gs.collapsed.has(id)).sort((a, b) => rank(a) - rank(b));
   const wrapW = Math.max(width, 1000);
   // With a tree, plain object cards (like the table that owns the arrays) go in a band just above the arrays that hold pointers,
   // so their arrows drop onto the array without crossing the arrows that leave it. Arrays without pointers stay above the band.
@@ -223,8 +321,12 @@ export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<nu
     };
     for (const r of [...roots, ...treeIds]) if (!placed.has(r)) visit(r, 0);   // anything left (a cycle) starts its own tree
     const rowTall = Math.max(...treeIds.map((id) => recGeom(heap[id]).h)) + 82;
-    for (const id of treeIds) { const g = recGeom(heap[id]), q = pos.get(id)!; boxes[id] = { id, kind: 'card', x: x0 + q.x * slot, y: y0 + q.d * rowTall, w: g.w, h: g.h, lane: -1, rec: true, mainH: g.mainH }; geomOf.set(id, g); }
-    width = Math.max(width, x0 + Math.max(...[...pos.values()].map((q) => q.x)) * slot + slot + GEOM.pad);
+    // M6: positions are remembered by object id. A node keeps its place unless the fresh tidy layout wants it more than half a slot away
+    // (or two nodes in a row would touch), so growing or rotating a tree moves as few nodes as it can while parents stay near their children.
+    const sx = stabilize(pos, state.tx), lo = Math.min(...sx.values());
+    let origin = state.tOrigin ?? lo; if (lo < origin || lo - origin > 2) origin = lo; state.tOrigin = origin;
+    for (const id of treeIds) { const g = recGeom(heap[id]), q = { x: sx.get(id)! - origin, d: pos.get(id)!.d }; boxes[id] = { id, kind: 'card', x: x0 + q.x * slot, y: y0 + q.d * rowTall, w: g.w, h: g.h, lane: -1, rec: true, mainH: g.mainH }; geomOf.set(id, g); }
+    width = Math.max(width, x0 + (Math.max(...sx.values()) - origin) * slot + slot + GEOM.pad);
     totalH = Math.max(totalH, y0 + (maxD + 1) * rowTall);
   };
   for (const id of flatIds) {
@@ -234,12 +336,49 @@ export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<nu
     if (rec) geomOf.set(id, rec);
     cx += cw + CARD.gap; crow = Math.max(crow, h); width = Math.max(width, cx - CARD.gap + GEOM.pad); totalH = cy + crow + GEOM.belowH / 2;
   }
-  if (above && treeIds.length) {
+  if (above && (treeIds.length || flatIds.length)) {
     const bandH = cy + crow + GEOM.belowH / 2 - splitY;
     for (const b of Object.values(boxes)) if (b.kind !== 'card' && b.y >= splitY) b.y += bandH;
     totalH = bandH + lanesH;
-    placeTree(GEOM.pad, bandH + lanesH + GEOM.tagH);
+    if (treeIds.length) placeTree(GEOM.pad, bandH + lanesH + GEOM.tagH);
   } else if (treeIds.length) placeTree(flatIds.length ? cx : GEOM.pad, (occupied.length ? lanesH : 0) + GEOM.tagH);
+  if (!treeIds.length) { state.tx.clear(); state.tOrigin = undefined; }
+
+  // M6 graph mode: vertices in layers (distance from a root), crossings reduced, positions remembered by id.
+  const graphLinks: Link[] = [];
+  if (gs.vertices.length) {
+    const vids = gs.vertices.slice().sort((a, b) => rank(a) - rank(b)), vset = new Set(vids);
+    const edges = new Map<string, string[]>(), count = new Map<string, number>();
+    for (const v of vids) {
+      const targets = vertexEdges(heap, v, gs);
+      for (const t of targets) count.set(`${v}|${t}`, (count.get(`${v}|${t}`) ?? 0) + 1);
+      edges.set(v, [...new Set(targets)].filter((t) => t !== v && vset.has(t)));
+    }
+    const fresh = layeredLayout({ ids: vids, out: edges });
+    const sx = stabilize(fresh, state.gx), lo = Math.min(...sx.values());
+    let origin = state.gOrigin ?? lo; if (lo < origin || lo - origin > 2) origin = lo; state.gOrigin = origin;
+    const hOf = new Map(vids.map((v) => [v, vertexHeight(heap[v], vertexCutOff(heap, v, gs))])), maxH = Math.max(...hOf.values());
+    const slot = VERTEX.w + VERTEX.gapX, rowTall = maxH + VERTEX.gapY;
+    const y0 = (occupied.length || flatIds.length || treeIds.length ? totalH + 10 : 0) + GEOM.tagH;
+    let depth = 0;
+    for (const v of vids) { const q = fresh.get(v)!; depth = Math.max(depth, q.d); boxes[v] = { id: v, kind: 'card', x: GEOM.pad + (sx.get(v)! - origin) * slot, y: y0 + q.d * rowTall, w: VERTEX.w, h: hOf.get(v)!, lane: -1, vertex: true }; }
+    width = Math.max(width, GEOM.pad + (Math.max(...sx.values()) - origin) * slot + VERTEX.w + GEOM.pad);
+    totalH = Math.max(totalH, y0 + depth * rowTall + maxH + GEOM.belowH / 2);
+    // One line per pair of vertices. Two vertices that point at each other share one line with a head at both ends; a line with one head is a one-way edge.
+    const allBoxes = Object.values(boxes), done = new Set<string>();
+    for (const a of vids) for (const t of edges.get(a)!) {
+      const key = [a, t].sort().join('|'); if (done.has(key)) continue; done.add(key);
+      const rev = edges.get(t)!.includes(a), ab = count.get(`${a}|${t}`) ?? 0, ba = count.get(`${t}|${a}`) ?? 0;
+      const [from, to] = rank(a) <= rank(t) || !rev ? [a, t] : [t, a], both = rev;
+      const { d, mid } = edgePath(boxes[from], boxes[to], allBoxes, both);
+      const label = both ? (ab > 1 || ba > 1 ? `×${from === a ? ab : ba} ×${from === a ? ba : ab}` : undefined) : (ab > 1 ? `×${ab}` : undefined);
+      graphLinks.push({ from, to, d, both, label, mid });
+    }
+    for (const v of vids) if (count.get(`${v}|${v}`)) {   // a vertex that points at itself: a small loop out of its right side
+      const b = boxes[v];
+      graphLinks.push({ from: v, to: v, d: `M ${b.w + 1} ${b.h * 0.3} C ${b.w + 40} ${b.h * 0.3 - 14}, ${b.w + 40} ${b.h * 0.7 + 14}, ${b.w + 3} ${b.h * 0.7}`, label: count.get(`${v}|${v}`)! > 1 ? `×${count.get(`${v}|${v}`)}` : undefined, mid: { x: b.w + 26, y: b.h * 0.5 + 4 } });
+    }
+  }
   const links: Link[] = [];
   // Pointer fields on list nodes other than the chain link (prev, parent, owner ...).
   for (const id of listNodes) {
@@ -259,14 +398,17 @@ export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<nu
   const tags: Record<string, string[]> = {}, nulls: string[] = [];
   for (const f of event.frames) for (const [name, v] of Object.entries(f.locals)) {
     const label = f.depth === 0 ? name : `${f.function}:${name}`;
-    if (v.kind === 'ref' && boxes[v.id]) (tags[v.id] ??= []).push(label);
+    const col = v.kind === 'ref' ? gs.collapsed.get(v.id) : undefined;
+    if (col && boxes[col.owner]) (tags[col.owner] ??= []).push(`${label} (${col.field} list)`);
+    else if (v.kind === 'ref' && boxes[v.id]) (tags[v.id] ??= []).push(label);
     else if (v.kind === 'scalar' && v.value === null && !nulls.includes(label)) nulls.push(label);
   }
-  const routed = route ? routeLinks(links, boxes, width, tags) : { maxX: 0, needs: new Map<number, number>() };   // route=false: layout state only, arrows get routed when the scene is shown
+  for (const l of links) if (vertexSet.has(l.to) && !vertexSet.has(l.from)) { const d = pointerToVertex(l, boxes); if (d) l.d = d; }   // M6: clean curves into vertices
+  const routed = route ? routeLinks(links.filter((l) => !l.d), boxes, width, tags) : { maxX: 0, needs: new Map<number, number>() };   // route=false: layout state only, arrows get routed when the scene is shown
   if (!extra && routed.needs.size) return buildScene(event, state, routed.needs);   // lay out again with room for the channels
   width = Math.max(width, routed.maxX);
   const undrawn: { id: string; type: string }[] = []; // every captured object now has a box
-  return { lanes, boxes, links, tags, nulls, cards: cardIds, undrawn, width, height: totalH + 40 };   // room for same-row arrows that drop under the row
+  return { lanes, boxes, links: graphLinks.length ? [...links, ...graphLinks] : links, tags, nulls, cards: [...cardIds, ...gs.vertices], undrawn, width, height: totalH + 40 };   // room for same-row arrows that drop under the row
 }
 
 // All scenes for a trace, built once in order so lane choices carry forward. Stepping backward just indexes this array.
@@ -281,7 +423,7 @@ export function buildScenes(trace: Trace): Scene[] {
 export interface SceneCache { get(i: number): Scene; step(max: number, ms?: number): boolean; built(): number }
 export function sceneCache(trace: Trace): SceneCache {
   const state = newLayoutState(), scenes: Scene[] = [], snaps: LayoutState[] = [], shown = new Map<number, Scene>();
-  const clone = (st: LayoutState): LayoutState => ({ laneOf: new Map(st.laneOf), headOf: new Map(st.headOf), rank: new Map(st.rank) });
+  const clone = cloneLayoutState;
   // Scenes are laid out in order so lane choices carry forward, but arrow routing (the costly part) is done only for a scene that is asked for, from the lane state just before it.
   const upTo = (i: number) => { while (scenes.length <= i && scenes.length < trace.events.length) { snaps.push(clone(state)); scenes.push(buildScene(trace.events[scenes.length], state, undefined, false)); } };
   return {
@@ -322,6 +464,7 @@ export const cellCentre = (cell: number) => cell * GEOM.cell + GEOM.cell / 2;
 
 // SVG path for one arrow, in the coordinate space of its source box (so the arrow travels with its source).
 export function linkPath(link: Link, boxes: Record<string, Box>): string | null {
+  if (link.d) return link.d;
   const routed = routeOf.get(link);
   if (routed) return routed;
   return basePath(link, boxes);
