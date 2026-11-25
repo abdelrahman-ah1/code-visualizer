@@ -91,3 +91,17 @@ Schema evolution: new meanings for existing fields require a new major version. 
 See CPP_LIMITS.md. Top level: `diagnostics` (array of {source, severity, kind, line?, message}), `exit_code`, `compile_ms`, `trace_ms`.
 Heap nodes: `storage` ("stack"|"heap"|"global"), `address`, `freed` (bool, observed free), `element_type`; node types `array`, `std::vector`.
 Frame named `<globals>` holds C++ globals. Readers that ignore unknown fields keep working.
+
+## Optional `unreached_heap` (C++ snapshots)
+
+An event may carry `"unreached_heap": {"count": N, "bytes": B}`: live heap blocks the program allocated (and has not freed) that this snapshot could not draw. Every live block is drawn, either as its type (see `orphan`) or as raw bytes (`"type": "untyped block"`), so this appears only when the per-snapshot node budget (300 nodes) ran out; `truncated` then also contains `orphans`. It is a count, not a diagnosis. A consumer should show it. Absent means every tracked live block is drawn.
+
+## Optional `orphan` on heap objects (C++)
+
+A heap object may carry `"orphan": true`: the block is still allocated (never freed), but it is not reachable through the captured roots in this snapshot (no captured local, global, file-level static or top-level function-static leads to it, directly or through other blocks) (statics declared in nested blocks, lambdas or library code, thread-locals, registers and unmanaged buffers are not checked, so this is not a leak report), for example because the only chain to it ran through a node that was freed, or because it leaked. The tracker re-reads such a block as the type it was last seen with through a typed pointer (struct, scalar or array). A block never seen with a type is drawn as `"type": "untyped block"` (an array of `byte` items, `length` = block size, first 40 bytes) with no type invented and no `orphan` claim. Reachable nodes beyond the old depth limit are drawn normally.
+
+## Compressed recordings (`.json.gz`)
+
+A recording may be stored gzip-compressed. The viewer detects gzip by its first two bytes, not the file name, and `.json` files open exactly as before. The compressed bytes unpack to the same JSON text (the viewer saves the exact validated text, nothing is re-serialised). The 20 MiB limit applies to the unpacked text: unpacking stops as soon as that limit is passed, and a truncated or damaged file is refused with the previous recording kept. Saving and opening use the browser's Compression Streams; where they are missing, `.json` and session export still work and the save button is hidden.
+
+When the recording file itself reaches its size limit (16 MiB), the run ends with status `trace_limit` and a diagnostic saying so; the steps recorded before that point are kept and are a valid beginning of the run (the incomplete last line is dropped). It is no longer reported as `worker_error`.
