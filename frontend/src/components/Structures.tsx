@@ -66,7 +66,7 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
       {arrows}
     </g>;
   };
-  const gs = useMemo(() => graphSpec(event), [event]);
+  const gs = useMemo(() => scene.graph ?? graphSpec(event), [event, scene]);
   // A graph vertex: a rounded card with its plain values. Its pointer fields and neighbour list are the arrows (one-way edges have one head,
   // two vertices that point at each other share a line with two heads). The title lists every edge and the list it came from.
   const renderVertex = (id: string, b: Scene['boxes'][string], node: TraceEvent['heap'][string], tag: string[] | undefined, m: string) => {
@@ -139,6 +139,7 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
                   <text className="cell-value" x={cellCentre(i)} y={GEOM.cell / 2 + 4} textAnchor="middle">{arrowed ? '•' : fmt(v, 5)}</text></g>
                   <text className="cell-index" x={cellCentre(i)} y={GEOM.cell + 13} textAnchor="middle">{i}</text></g>;
               })}
+              {items.length === 0 && omitted === 0 && <g className="cell" data-testid="empty-array"><rect className="cell-box empty" width={GEOM.cell} height={GEOM.cell}/><text className="cell-value" x={cellCentre(0)} y={GEOM.cell / 2 + 4} textAnchor="middle">[ ]</text><title>{`empty ${node.type}`}</title></g>}
               {omitted > 0 && <g className="cell"><rect className="cell-box omitted" x={items.length * GEOM.cell} width={GEOM.cell} height={GEOM.cell}/><text className="cell-value" x={cellCentre(items.length)} y={GEOM.cell / 2 + 4} textAnchor="middle">…</text><title>{`${omitted} more not captured`}</title></g>}
               {arrows}
             </g>;
