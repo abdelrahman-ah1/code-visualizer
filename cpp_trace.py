@@ -131,7 +131,10 @@ def child_env(extra=None):
     return env
 
 
-def limiter(cpu_seconds, address_space=None, file_bytes=16 * 1024 * 1024):
+FILE_LIMIT_BYTES = 16 * 1024 * 1024
+
+
+def limiter(cpu_seconds, address_space=None, file_bytes=FILE_LIMIT_BYTES):
     """Best-effort Unix limits applied to child processes. They stop accidents, not attackers."""
     def apply():
         os.setsid()
@@ -303,17 +306,25 @@ def parse_sanitizer(text):
             break
     # LeakSanitizer.
     if "LeakSanitizer: detected memory leaks" in text:
-        count = 0
+        direct = [0, 0]      # bytes, objects: blocks nothing points to any more
+        indirect = [0, 0]    # blocks only reachable through a direct leak
+        shown = 0
         for lm in re.finditer(r"(Direct|Indirect) leak of (\d+) byte\(s\) in (\d+) object\(s\) allocated from:\n((?:\s+#\d+[^\n]*\n?)+)", text):
             fm = FRAME.search(lm[4])
             if lm[1] == "Direct":
-                out.append(diag("sanitizer", "warning", "memory-leak", fm["line"] if fm else None,
-                                "Memory leak: %s bytes in %s object(s) were never freed" % (lm[2], lm[3])))
-                count += 1
-            if count >= 5:
-                break
-        if count == 0:
+                direct[0] += int(lm[2]); direct[1] += int(lm[3])
+                if shown < 5:
+                    out.append(diag("sanitizer", "warning", "memory-leak", fm["line"] if fm else None,
+                                    "Memory leak (direct): %s bytes in %s object(s) lost, never freed. Objects only reachable through them are counted in the total below" % (lm[2], lm[3])))
+                    shown += 1
+            else:
+                indirect[0] += int(lm[2]); indirect[1] += int(lm[3])
+        if direct[1] == 0:
             out.append(diag("sanitizer", "warning", "memory-leak", None, "Memory leak: some allocated memory was never freed"))
+        else:
+            out.append(diag("sanitizer", "warning", "memory-leak", None,
+                            "Total never freed: %d bytes in %d object(s) (%d bytes in %d directly lost, %d bytes in %d reachable only through those)"
+                            % (direct[0] + indirect[0], direct[1] + indirect[1], direct[0], direct[1], indirect[0], indirect[1])))
     return out[:MAX_DIAGNOSTICS]
 
 
@@ -488,6 +499,8 @@ def capture_cpp(source, stdin="", timeout=5.0, max_events=500, max_output=8192):
             diags.append(diag("tracer", "info", "trace-limit", None,
                               ("Recording stopped because the call stack grew deeper than 32 frames (endless recursion?)."
                                if limit_kind == "frames" else
+                               ("Recording stopped after %d steps because the recording reached its %d MiB file limit. The program may have continued; the steps shown are a valid beginning of the run. A separate memory check covered the whole run." % (len(events), FILE_LIMIT_BYTES // 1048576))
+                               if limit_kind == "file" else
                                "Recording stopped after %d steps. The program may have continued. A separate memory check covered the whole run." % max_events)))
         if final.get("status") == "timeout":
             diags.append(diag("tracer", "warning", "timeout", stuck_line,
@@ -547,7 +560,7 @@ def sanitizer_check(gpp, root, stdin, timeout, env, result):
     try:
         with open(root / "san.log", "wb") as log:
             code, timed_out, _ = run_limited(
-                [gpp, *STD_FLAGS, "-O1", "-fsanitize=address,undefined", "-fno-sanitize-recover=address", "-fno-inline",
+                [gpp, *STD_FLAGS, "-O0", "-fsanitize=address,undefined", "-fno-sanitize-recover=address", "-fno-inline",
                  "-include", "prelude.h", SOURCE_NAME, "-o", "prog_san"], root, COMPILE_TIMEOUT, env,
                 stdout=log, stderr=log, cpu=COMPILE_TIMEOUT + 5)
         diags = [d for d in parse_compiler(read_text(root / "san.log")) if d["severity"] == "warning"]
