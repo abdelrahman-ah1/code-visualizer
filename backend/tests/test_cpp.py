@@ -125,6 +125,142 @@ class Supported(unittest.TestCase):
         self.assertEqual(loc["name"]["value"], "Ada")
         self.assertEqual([i["value"] for i in ev["heap"][loc["v"]["id"]]["items"]], [1, 2, 3, 4])
 
+    def test_c_strings_stop_at_their_terminator(self):
+        # gdb's string(length=N) reads N bytes through NULs: neighbours must not leak into each value.
+        r = run("c_strings")
+        ev = r["events"][-1]
+        loc = ev["frames"][-1]["locals"]
+        self.assertEqual(loc["one"]["value"], "kiwi")
+        words = ev["heap"][loc["words"]["id"]]["items"]
+        self.assertEqual([w["value"] for w in words], ["apple", "pear", "", "fig"])
+        self.assertFalse(any(w.get("truncated") for w in words + [loc["one"]]))
+
+    def test_live_node_behind_freed_node_is_recovered_as_orphan(self):
+        # "apple" was linked behind "pear", then pear was deleted. Nothing points at apple, but it is still allocated:
+        # it must still be captured (flagged orphan), not silently missing.
+        r = run("hash_chain", max_events=2000)
+        self.assertEqual(r["status"], "ok")
+        last = r["events"][-1]
+        keys = {n["fields"]["key"]["value"]: n for n in last["heap"].values() if n.get("fields") and "key" in n["fields"]}
+        self.assertEqual(set(keys), {"apple", "kiwi", "lime", "plum", "fig"})
+        self.assertTrue(keys["apple"].get("orphan"))
+        self.assertFalse(any(keys[k].get("orphan") for k in ("kiwi", "lime", "plum", "fig")))
+        self.assertEqual(keys["apple"]["fields"]["value"]["value"], 0)
+        self.assertNotIn("unreached_heap", last)                 # everything live is drawn
+        self.assertTrue(any(n.get("freed") for n in last["heap"].values()))   # the deleted node is still shown as freed
+
+    def test_block_that_never_had_a_type_is_shown_as_raw_bytes_not_invented(self):
+        r = run("lost_block")
+        last = r["events"][-1]
+        self.assertNotIn("unreached_heap", last)                   # it is drawn
+        nodes = [n for n in last["heap"].values() if n["storage"] == "heap"]
+        self.assertEqual([n["type"] for n in nodes], ["untyped block"])
+        self.assertEqual([i["value"] for i in nodes[0]["items"]], [5, 0, 0, 0])   # the int 5, as bytes, no type claimed
+        self.assertEqual(nodes[0]["length"], 4)
+        self.assertFalse(nodes[0].get("orphan"))
+
+    def test_budget_overflow_is_explicit_not_silent(self):
+        r = run("leak_many", max_events=100)
+        last = r["events"][-1]
+        self.assertIn("orphans", last["truncated"])
+        self.assertGreater(last["unreached_heap"]["count"], 0)
+        self.assertLessEqual(len(last["heap"]), 300)
+
+    def test_unreachable_chain_is_fully_recovered_without_a_cap(self):
+        # 89 live nodes are cut off from head. All must be drawn (the old limit was 40); the reachable 61 are not flagged.
+        r = run("lost_chain", max_events=100)
+        last = r["events"][-1]
+        self.assertEqual(sum(1 for n in last["heap"].values() if n.get("orphan")), 89)
+        self.assertEqual(len(last["heap"]), 150)
+        self.assertNotIn("unreached_heap", last)
+        self.assertEqual(last["truncated"], [])
+
+    def test_long_reachable_chain_is_drawn_whole_and_not_called_unreachable(self):
+        r = run("lost_chain", max_events=100)
+        mid = [e for e in r["events"] if e["line"] == 6][0]      # 150 reachable nodes in one chain
+        self.assertEqual(len(mid["heap"]), 150)
+        self.assertFalse(any(n.get("orphan") for n in mid["heap"].values()))
+        self.assertEqual(mid["truncated"], [])
+
+    def test_dropped_scalar_and_array_blocks_are_recovered(self):
+        r = run("lost_scalar_array")
+        orph = [n for n in r["events"][-1]["heap"].values() if n.get("orphan")]
+        self.assertEqual(sorted(n["type"] for n in orph), ["array", "int"])
+        self.assertEqual([n["length"] for n in orph if n["type"] == "array"], [5])
+        self.assertNotIn("unreached_heap", r["events"][-1])
+
+    def test_smart_pointers_show_what_they_own(self):
+        r = run("smart_ptrs")
+        ev = [e for e in r["events"] if e["line"] == 8][0]       # everything alive, before main returns
+        self.assertNotIn("unreached_heap", ev)
+        ks = sorted(n["fields"]["k"]["value"] for n in ev["heap"].values() if n.get("fields") and "k" in n["fields"])
+        self.assertEqual(ks, [1, 2])
+        self.assertTrue(any(n.get("fields", {}).get("v", {}).get("value") == 3 for n in ev["heap"].values()))
+
+    def test_map_list_set_contents_are_drawn(self):
+        r = run("containers")
+        ev = [e for e in r["events"] if e["line"] == 11][0]
+        self.assertNotIn("unreached_heap", ev)
+        kinds_ = sorted(n["type"] for n in ev["heap"].values() if n["storage"] == "stack")
+        self.assertEqual(kinds_, ["dict", "dict", "std::list", "std::set"])
+        st = [n for n in ev["heap"].values() if n["type"] == "std::set"][0]
+        self.assertEqual(st["element_type"], "int")
+        self.assertEqual([i["value"] for i in st["items"]], [1, 2, 3])
+        self.assertEqual(sum(1 for n in ev["heap"].values() if n["storage"] == "heap"), 3)
+
+    def test_nodes_held_by_globals_and_statics_are_never_flagged_unreachable(self):
+        # reachable from: a global, a file-level static, a function-local static (function not running); one node is really lost
+        r = run("globals_statics")
+        self.assertEqual(r["status"], "ok")
+        ev = r["events"][-1]
+        nodes = {n["fields"]["v"]["value"]: n for n in ev["heap"].values() if n.get("type") == "N"}
+        self.assertEqual(sorted(nodes), [1, 2, 3, 9, 11])                       # 1 and 11 (global chain), 2 (file static), 3 (function static), 9 (lost)
+        for v in (1, 2, 3, 11):
+            self.assertFalse(nodes[v].get("orphan"), "node %s is reachable from a global or static" % v)
+        self.assertTrue(nodes[9].get("orphan"))
+        self.assertNotIn("untyped block", [n.get("type") for n in ev["heap"].values()])
+
+    def test_static_in_a_nested_block_is_a_known_root_gap_and_is_not_called_orphan(self):
+        # KNOWN LIMIT: only statics at the top of a function are collected as roots. A static declared inside a nested
+        # block is not, so its block is drawn as an untyped block of raw bytes. It must stay visible and must NOT be
+        # labelled as an orphan (no variable we check points at it, but we cannot claim that for this case).
+        r = run("nested_static")
+        self.assertEqual(r["status"], "ok")
+        heap = r["events"][-1]["heap"]
+        self.assertEqual(len(heap), 1)
+        node = next(iter(heap.values()))
+        self.assertEqual(node["type"], "untyped block")
+        self.assertFalse(node.get("orphan"))
+
+    def test_lost_pointer_node_stays_allocated_intact_and_flagged_unreachable(self):
+        r = run("lost_pointer")
+        before = [e for e in r["events"] if e["line"] == 9][0]    # the line that loses the pointer has not run yet
+        after = [e for e in r["events"] if e["line"] == 10][0]
+
+        def by_key(ev):
+            return {n["fields"]["key"]["value"]: (a, n) for a, n in ((n["address"], n) for n in ev["heap"].values())
+                    if n.get("fields") and "key" in n["fields"]}
+        b, a = by_key(before), by_key(after)
+        self.assertEqual(sorted(b), [20, 30, 50, 70])
+        self.assertEqual(sorted(a), [20, 30, 50, 70])               # nothing disappeared
+        for key in (20, 30):
+            self.assertEqual(b[key][0], a[key][0])                  # same block (same address), so same node
+            self.assertFalse(b[key][1].get("orphan"))               # reachable before
+            self.assertTrue(a[key][1].get("orphan"))                # unreachable after
+            self.assertFalse(a[key][1].get("freed"))                # and not freed
+            self.assertEqual(b[key][1]["fields"]["value"], a[key][1]["fields"]["value"])   # contents intact
+        for key in (50, 70):
+            self.assertFalse(a[key][1].get("orphan"))
+        self.assertNotIn("unreached_heap", after)
+
+    def test_leaked_node_is_shown_as_orphan(self):
+        r = run("leak")
+        self.assertTrue(any(n.get("orphan") for n in r["events"][-1]["heap"].values()))
+
+    def test_fully_reachable_heap_has_no_unreached_note(self):
+        r = run("tree")
+        self.assertNotIn("unreached_heap", r["events"][-1])
+
     def test_exit_code_is_reported_not_hidden(self):
         r = run("tree")        # main returns the root key, 5
         self.assertEqual((r["status"], r["exit_code"]), ("ok", 5))
@@ -195,6 +331,18 @@ class ErrorsAndLimits(unittest.TestCase):
         d = diag(r, "memory-leak")
         self.assertEqual((d["severity"], d["line"]), ("warning", 3))
 
+    def test_leak_report_counts_indirect_leaks_too(self):
+        # lost_pointer never frees anything: node 50 and node 30 are lost directly, 70 and 20 hang off them.
+        # The memory check must be built like the traced program (-O0); at -O1 the optimizer removed two of the
+        # four allocations and the report said 48 bytes in 2 objects.
+        r = run("lost_pointer")
+        d = [x for x in r["diagnostics"] if x["kind"] == "memory-leak"]
+        self.assertEqual(sorted(x["line"] for x in d if x.get("line")), [5, 6])
+        self.assertTrue(all(x["message"].startswith("Memory leak (direct): 24 bytes in 1 object") for x in d if x.get("line")))
+        total = [x["message"] for x in d if not x.get("line")]
+        self.assertEqual(len(total), 1)
+        self.assertIn("Total never freed: 96 bytes in 4 object(s) (48 bytes in 2 directly lost, 48 bytes in 2 reachable only through those)", total[0])
+
     def test_buffer_overflows(self):
         r = run("overflow")
         self.assertEqual(r["status"], "ok")                     # the plain run survives; only the checker sees it
@@ -229,6 +377,151 @@ class ErrorsAndLimits(unittest.TestCase):
     def test_event_limit(self):
         r = run("big_output", max_events=50)
         self.assertEqual((r["status"], len(r["events"])), ("trace_limit", 50))
+
+    def test_local_declared_after_an_early_return_is_not_shown(self):
+        """A local whose declaration was skipped by an early return holds garbage; it must not appear or be followed."""
+        src = (
+            "struct N { int v; N* next; };\n"
+            "N* pick(N* a, int k) {\n"
+            "  if (k > 0) return a;\n"
+            "  N* later = a->next;\n"
+            "  return later;\n"
+            "}\n"
+            "int main() {\n"
+            "  N b{2, nullptr}; N a{1, &b};\n"
+            "  N* r = pick(&a, 1);\n"
+            "  N* s = pick(&a, 0);\n"
+            "  return r == s;\n"
+            "}\n")
+        runs = [cpp_trace.capture_cpp(src, "", 8.0, 200) for _ in range(2)]
+        for r in runs:
+            self.assertEqual(r["status"], "ok")
+            for ev in r["events"]:
+                for fr in ev["frames"]:
+                    if fr["function"] == "pick" and ev["event"] == "return" and ev["step"] < 6:
+                        pass
+        first_call = [ev for ev in runs[0]["events"] if ev["frames"][-1]["function"] == "pick" and ev["frames"][-1]["line"] == 3]
+        self.assertTrue(first_call)
+        # in the call that returned early, `later` is never shown; in the call that ran line 4 it is
+        calls = []
+        cur = None
+        for ev in runs[0]["events"]:
+            top = ev["frames"][-1]
+            if top["function"] != "pick":
+                cur = None
+                continue
+            if ev["event"] == "call":
+                cur = []
+                calls.append(cur)
+            if cur is not None:
+                cur.append(top["locals"])
+        self.assertEqual(len(calls), 2)
+        self.assertFalse(any("later" in loc for loc in calls[0]), "skipped declaration shown")
+        self.assertTrue(any("later" in loc for loc in calls[1]), "executed declaration missing")
+        # and the recording is repeatable (the garbage value used to differ from run to run)
+        self.assertEqual(json.dumps(runs[0]["events"], sort_keys=True), json.dumps(runs[1]["events"], sort_keys=True))
+
+    def test_destroyed_library_objects_do_not_show_freed_buffer_garbage(self):
+        """After a vector or string is destroyed at scope end its buffer is freed; it must not be read as if still live."""
+        src = (
+            "#include <string>\n"
+            "#include <vector>\n"
+            "int main() {\n"
+            "    std::string name = \"a string that is longer than the small-string buffer\";\n"
+            "    std::vector<int> v = {1, 2, 3};\n"
+            "    v.push_back(4);\n"
+            "    int n = (int)v.size();\n"
+            "    return n == 4 ? 0 : 1;\n"
+            "}\n")
+        runs = [cpp_trace.capture_cpp(src, "", 8.0, 300) for _ in range(2)]
+        for r in runs:
+            self.assertEqual(r["status"], "ok")
+            seen_released = False
+            seen_live = set()
+            for ev in r["events"]:
+                loc = ev["frames"][-1]["locals"] if ev["frames"] else {}
+                v = loc.get("v")
+                if v and v.get("kind") == "ref":
+                    node = ev["heap"][v["id"]]
+                    if node.get("items") is not None:
+                        vals = [i.get("value") for i in node["items"]]
+                        self.assertIn(vals, ([], [1, 2, 3], [1, 2, 3, 4]), "vector shows values that are not its contents")
+                        seen_live.add(len(vals)) if vals else None
+                    elif "(buffer released)" in node.get("type", ""):
+                        seen_released = True
+                        self.assertTrue(node.get("opaque"))
+                        self.assertFalse(node.get("freed"), "a stack object is not freed, only its buffer")
+                name = loc.get("name")
+                if name and name.get("kind") == "scalar":
+                    self.assertEqual(name["value"], "a string that is longer than the small-string buffer")
+            self.assertEqual(seen_live, {3, 4}, "values before destruction must still be shown")
+            self.assertTrue(seen_released, "destroyed vector never marked as released")
+        self.assertEqual(json.dumps(runs[0]["events"], sort_keys=True), json.dumps(runs[1]["events"], sort_keys=True))
+
+    def test_live_containers_with_dangling_or_lookalike_values_are_not_marked_released(self):
+        """A live container may hold a deleted pointer, a value equal to a freed address, or reallocate: it is still live."""
+        src = (
+            "#include <vector>\n#include <map>\n#include <list>\n#include <set>\n#include <string>\n"
+            "struct Node { int v; };\n"
+            "int main() {\n"
+            "    Node* d = new Node{7};\n"
+            "    unsigned long addr = (unsigned long)d;\n"
+            "    std::vector<Node*> vp; vp.push_back(d);\n"
+            "    std::map<int, Node*> mp; mp[1] = d;\n"
+            "    std::list<Node*> lp; lp.push_back(d);\n"
+            "    std::set<unsigned long> sa; sa.insert(addr);\n"
+            "    std::vector<unsigned long> va; va.push_back(addr);\n"
+            "    delete d;\n"
+            "    std::string lookalike((const char*)&addr, 8);\n"
+            "    std::vector<int> g; g.reserve(2); g.push_back(1); g.push_back(2); g.push_back(3);\n"
+            "    g.clear(); g.shrink_to_fit(); g.push_back(5);\n"
+            "    int last = (int)va.size() + (int)sa.size() + (int)lp.size() + (int)mp.size() + (int)vp.size() + g[0];\n"
+            "    return last == 10 ? 0 : 1;\n"
+            "}\n")
+        r = cpp_trace.capture_cpp(src, "", 8.0, 300)
+        self.assertEqual(r["status"], "ok")
+        # the event whose line is the 'int last' statement: everything is still alive
+        at = [e for e in r["events"] if e["frames"][-1]["line"] == 19][0]
+        for e in r["events"]:
+            if e["frames"][-1]["line"] >= 21:
+                break
+            for n in e["heap"].values():
+                self.assertNotIn("(buffer released)", str(n.get("type", "")), "live container marked released at line %s" % e["frames"][-1]["line"])
+        loc = at["frames"][-1]["locals"]
+        def items(name):
+            n = at["heap"][loc[name]["id"]]
+            return n.get("items"), n
+        self.assertEqual([i["value"] for i in items("va")[0]], [int(items("va")[0][0]["value"])])
+        self.assertEqual(len(items("sa")[0]), 1)
+        self.assertEqual(len(items("lp")[0]), 1)
+        self.assertEqual(len(items("vp")[0]), 1)
+        self.assertEqual(at["heap"][loc["mp"]["id"]]["length"], 1)
+        self.assertEqual([i["value"] for i in items("g")[0]], [5])
+        self.assertNotEqual(loc["lookalike"].get("kind"), "opaque", "inline string bytes equal to a freed address are data, not a released buffer")
+        # the same objects after destruction (closing brace) do show a released buffer
+        end = r["events"][-1]
+        self.assertTrue(any("(buffer released)" in str(n.get("type", "")) for n in end["heap"].values()))
+
+    def test_recording_file_limit_is_a_limit_not_a_tracer_failure(self):
+        """The recording file reaching its size cap must end as trace_limit with a usable, validated beginning."""
+        hashtree = (Path(__file__).resolve().parents[2] / "frontend" / "tests" / "programs" / "hashtree.cpp").read_text(encoding="utf-8")
+        full = cpp_trace.capture_cpp(hashtree, "", 8.0, 2000)
+        full_bytes = len(json.dumps(full["events"]))
+        orig = cpp_trace.limiter.__defaults__
+        try:
+            cpp_trace.limiter.__defaults__ = (orig[0], max(65536, full_bytes // 3))
+            r = cpp_trace.capture_cpp(hashtree, "", 8.0, 2000)
+        finally:
+            cpp_trace.limiter.__defaults__ = orig
+        self.assertEqual((r["status"], r["complete"]), ("trace_limit", False))
+        self.assertNotIn("worker-failed", [d["kind"] for d in r["diagnostics"]])
+        self.assertIn("file limit", diag(r, "trace-limit")["message"])
+        n = len(r["events"])
+        self.assertTrue(0 < n < len(full["events"]))
+        # the kept beginning is the real beginning of the run, not a damaged or reordered one
+        key = lambda ev: (ev["event"], ev["line"], [f["function"] for f in ev["frames"]], sorted(ev["heap"]))
+        self.assertEqual([key(e) for e in r["events"]], [key(e) for e in full["events"][:n]])
+        self.assertEqual([e["step"] for e in r["events"]], list(range(n)))
 
     def test_oversized_output(self):
         r = run("big_output_oneline")
