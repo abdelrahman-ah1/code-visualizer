@@ -65,3 +65,52 @@ test('file-writing example: each run has its own folder, so one line is counted'
   await page.getByRole('button', { name: 'Last', exact: true }).click();
   await expect(page.getByTestId('stdout')).toContainText('lines in notes.txt: 1');
 });
+
+test('a live node behind freed memory is still drawn, flagged unreferenced', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.getByLabel('Language').selectOption('cpp');
+  await openEditor(page);
+  await page.getByLabel('C++ source code').fill(`#include <iostream>
+#include <string>
+struct Entry { std::string key; int value; Entry* next; };
+struct HashTable { Entry* buckets[4]; int size; };
+int hashOf(const std::string& k, int n) { int h = 0; for (char c : k) h = h * 31 + c; return (h < 0 ? -h : h) % n; }
+void put(HashTable* t, const std::string& k, int v) {
+  int i = hashOf(k, 4);
+  for (Entry* e = t->buckets[i]; e; e = e->next) if (e->key == k) { e->value = v; return; }
+  t->buckets[i] = new Entry{k, v, t->buckets[i]};
+  t->size++;
+}
+int main() {
+  HashTable t{}; 
+  const char* ks[] = {"apple","pear","fig","plum","kiwi","lime"};
+  for (int i = 0; i < 6; i++) put(&t, ks[i], i * 10);
+  put(&t, "fig", 99);
+  Entry* gone = t.buckets[hashOf("pear",4)];
+  delete gone;
+  std::cout << t.size << "\\n";
+  return 0;
+}
+`);
+  await run(page).click();
+  await expect(page.getByText(/Event 1 of \d+/)).toBeVisible({ timeout: 25000 });
+  await expect(page.locator('.node-box.orphan')).toHaveCount(0);           // nothing is orphaned at the first step
+  await page.getByRole('button', { name: 'Last', exact: true }).click();
+  await expect(page.locator('.node-box.orphan')).toHaveCount(1);           // "apple": still allocated, nothing points to it
+  await expect(page.getByText('· unreferenced')).toBeVisible();
+  await expect(page.getByTestId('unreached-heap')).toHaveCount(0);         // every live block is drawn
+  await expect(page.locator('[data-testid^="box-"]')).toHaveCount(9);      // 5 entries + the freed node + the table + 2 arrays (buckets, ks)
+  await page.screenshot({ path: `${SHOTS}/orphan-node.png`, fullPage: true });
+});
+test('a live block that never had a type is drawn as raw bytes, not invented', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.getByLabel('Language').selectOption('cpp');
+  await openEditor(page);
+  await page.getByLabel('C++ source code').fill('int main() {\n  void* p = new int(5);\n  p = nullptr;\n  return 0;\n}\n');
+  await run(page).click();
+  await expect(page.getByText(/Event 1 of \d+/)).toBeVisible({ timeout: 25000 });
+  await page.getByRole('button', { name: 'Last', exact: true }).click();
+  await expect(page.getByTestId('unreached-heap')).toHaveCount(0);
+  await page.screenshot({ path: `${SHOTS}/untyped-block.png`, fullPage: true });
+  await expect(page.locator('[data-testid^="box-"]', { hasText: 'untyped block' })).toBeVisible();
+});
