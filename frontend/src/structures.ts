@@ -555,5 +555,4 @@ function densify(pts: Pt[]): Pt[] {
   const out: Pt[] = [];
   for (let i = 1; i < pts.length; i++) { const n = Math.max(1, Math.ceil(Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y) / 6)); for (let k = 0; k < n; k++) out.push({ x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * k / n, y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * k / n }); }
   if (pts.length) out.push(pts[pts.length - 1]);
-  return out;
-                                                                 }
+  return out;}
