@@ -222,3 +222,8 @@ main[data-theme=light] .bp-hit { color:#a01628; }
   .replay-root:has(.col-right.closed) { margin-bottom:0; }
   .col-right:not(.closed) .tabs-panel { flex:none; height:var(--details-h); margin-bottom:calc(var(--details-shown) - var(--details-h)); }
 }
+
+/* Compartment records: pointer names and strips */
+.ptr-name { fill:var(--muted); font:9.5px 'SFMono-Regular',Consolas,monospace; }
+.ptr-strip { stroke-width:1; }
+.node-box.orphan { stroke:#e0a030; stroke-dasharray:5 3; }
