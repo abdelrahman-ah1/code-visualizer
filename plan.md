@@ -4,7 +4,7 @@ An interactive web platform that takes unmodified source code (Python, C++) and 
 
 - Repo: `github.com/abdelrahman-ah1/code-visualizer` (public since Nov 23, 2026)
 - Pace: ~2 hours/day, no deadline
-- Status: Milestones 1 to 4 done (tracer pack, replay interface, structures view, offline export, local backend/editor; all on `main`). Next: M5
+- Status: Milestones 1 to 6 done (tracer pack, replay interface, structures view, offline export, local backend/editor, C++ via g++ + gdb, graphs and stable layout; all on `main`). Next: M7
 - Updated Nov 24, 2026: M2, M3, M3.5 and M4 marked done after laptop testing.
 - Revised Nov 24, 2026: applied the 9-point review (repo visibility, TypeScript, trace contract reference, softened performance claims, milestone acceptance criteria, updated open questions)
 
@@ -103,9 +103,9 @@ Estimates are at ~2 hours/day and are planning estimates, not commitments. Each 
   - Done means: an exported file opens offline with everything needed for replay, and contains only the session's code, captured values, and output.
 - [x] **M4 — Local backend, editor, breakpoints, watch** *(~3 weeks)*: FastAPI server, paste-your-code editor, built-in examples, breakpoints, variable watch.
   - Done means: paste code → trace → replay works end to end; breakpoints and watch operate on recorded events; file-based replay still works; API and failure paths are tested.
-- [ ] **M5 — C++ via g++ + gdb** *(~3 weeks, gated)*: compile with debug info, trace with gdb, emit the same trace JSON. Gated on M1–M4 feeling solid.
+- [x] **M5 — C++ via g++ + gdb** *(~3 weeks, gated)*: compile with debug info, trace with gdb, emit the same trace JSON. Gated on M1–M4 feeling solid.
   - Done means: a narrow, documented C++ subset traces into the same contract, with unsupported behavior reported rather than faked.
-- [ ] **M6 — Graphs and trees + stable layout** *(~3 weeks)*: graph and tree rendering with layout that stays stable across steps (incremental Sugiyama/force-directed).
+- [x] **M6 — Graphs and trees + stable layout** *(~3 weeks)*: graph and tree rendering with layout that stays stable across steps (incremental Sugiyama/force-directed).
   - Done means: graphs and trees render with identity, cycles, and disconnected nodes correct, positions stable across steps, and the layout method chosen and profiled before any heavy dependency is added.
 - [ ] **M7 — Graduation / release**: MSA learner study (evaluation), README, architecture docs, reproducible demos. The repo is already public; release readiness is a separate gate.
   - Done means: evaluation materials and results exist, the README explains the design, and demos run reproducibly from a clean checkout.
@@ -141,3 +141,4 @@ Resolved since the last revision: the C++ backend question — answered in §5 (
 | Nov 23, 2026 | `TRACE_FORMAT.md` adopted as the source of truth for the trace contract |
 | Nov 23, 2026 | `agent.md` created as the coding-agent guide; keep it consistent with this plan |
 | Nov 24, 2026 | M2, M3, M3.5 and M4 marked done after laptop testing; next up is M5 (C++ via g++ + gdb) |
+| Nov 25, 2026 | M5 and M6 pushed and marked done; M6 stability is hysteresis (not a freeze) and graphs are drawn only for unshared same-type neighbour lists, see WALKTHROUGH_M6.md and TEST_REPORT_M6.md; next up is M7 |
