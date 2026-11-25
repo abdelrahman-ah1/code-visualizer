@@ -5,7 +5,7 @@ export type Value =
   | { kind: 'truncated'; type: string };
 export interface HeapNode {
   type: string; items?: Value[]; entries?: [Value, Value][];
-  fields?: Record<string, Value>; length?: number; truncated?: boolean; opaque?: boolean;
+  fields?: Record<string, Value>; length?: number; truncated?: boolean; opaque?: boolean; orphan?: boolean;
   // M5, C++ only. Optional extras: readers that do not know them ignore them.
   storage?: 'stack' | 'heap' | 'global' | 'unknown'; address?: string; freed?: boolean; element_type?: string;
 }
@@ -19,6 +19,7 @@ export interface TraceEvent {
   step: number; event: 'call' | 'line' | 'return' | 'exception'; line: number;
   frames: Frame[]; heap: Record<string, HeapNode>; stdout: string; stderr: string;
   truncated: string[]; return_value?: Value; exception_type?: string;
+  unreached_heap?: { count: number; bytes: number };
 }
 export type RunStatus = 'ok' | 'error' | 'timeout' | 'trace_limit' | 'output_limit' | 'unsupported' | 'worker_error';
 export interface Trace {
