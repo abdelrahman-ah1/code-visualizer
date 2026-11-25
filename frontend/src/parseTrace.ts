@@ -82,10 +82,11 @@ export function parseTrace(raw: string): Trace {
     integer(e.line, `${p}.line`);
     text(e.stdout, `${p}.stdout`); text(e.stderr, `${p}.stderr`);
     array(e.truncated, `${p}.truncated`).forEach((x) => text(x, `${p}.truncated`));
+    if (e.unreached_heap !== undefined) { const u = record(e.unreached_heap, `${p}.unreached_heap`); integer(u.count, `${p}.unreached_heap.count`); integer(u.bytes, `${p}.unreached_heap.bytes`); }
     const heap = record(e.heap, `${p}.heap`);
     Object.entries(heap).forEach(([id, rawNode]) => {
       const np = `${p}.heap.${id}`, n = record(rawNode, np);
-      text(n.type, `${np}.type`); optionalBoolean(n, 'truncated', np); optionalBoolean(n, 'opaque', np);
+      text(n.type, `${np}.type`); optionalBoolean(n, 'truncated', np); optionalBoolean(n, 'opaque', np); optionalBoolean(n, 'orphan', np);
       if (n.length !== undefined) integer(n.length, `${np}.length`);
       if (n.items !== undefined) array(n.items, `${np}.items`).forEach((v) => value(v, `${np}.items`, heap));
       if (n.entries !== undefined) array(n.entries, `${np}.entries`).forEach((entry) => {
