@@ -104,7 +104,7 @@ export const arrayOmitted = (n: HeapNode) => {
   return Math.max(0, (n.length ?? shown) - shown, n.truncated && (n.length ?? 0) <= shown ? 1 : 0);
 };
 
-export function buildScene(event: TraceEvent, state: LayoutState): Scene {
+export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<number, number>, route = true): Scene {
   const heap = event.heap, ids = Object.keys(heap);
   // First-seen order keeps lane choice deterministic. IDs are encounter order, but we do not rely on that.
   for (const id of ids) if (!state.rank.has(id)) state.rank.set(id, state.rank.size);
@@ -137,8 +137,9 @@ export function buildScene(event: TraceEvent, state: LayoutState): Scene {
   for (const id of listNodes.slice().sort((a, b) => rank(a) - rank(b))) if (!seen.has(id)) walk(id);
   for (const id of ids) if (isArray(heap[id])) structures.push({ kind: 'array', ids: [id], type: heap[id].type });
   // Arrays that hold pointers sit lowest, next to the objects they point at, so their arrows do not run across other arrays.
+  // (An array whose pointers all lead to other arrays stays above them, so those arrows run downward.)
   const ptrMemo = new Map<Structure, number>();
-  const ptrArray = (st: Structure) => { let v = ptrMemo.get(st); if (v === undefined) { v = st.kind === 'array' && (heap[st.ids[0]].items ?? []).some((x) => x.kind === 'ref') ? 1 : 0; ptrMemo.set(st, v); } return v; };
+  const ptrArray = (st: Structure) => { let v = ptrMemo.get(st); if (v === undefined) { v = st.kind === 'array' && (heap[st.ids[0]].items ?? []).some((x) => x.kind === 'ref' && !(heap[x.id] && isArray(heap[x.id]))) ? 1 : 0; ptrMemo.set(st, v); } return v; };
   structures.sort((a, b) => ptrArray(a) - ptrArray(b) || Math.min(...a.ids.map(rank)) - Math.min(...b.ids.map(rank)));
 
   // Lane assignment: a structure keeps a lane one of its members already had, so rows do not shuffle.
@@ -166,6 +167,8 @@ export function buildScene(event: TraceEvent, state: LayoutState): Scene {
     const r = rowOf.get(laneFor[i])!;
     rowH[r] = Math.max(rowH[r], GEOM.tagH + Math.max(...st.ids.map((id) => geomOf.get(id)!.h)) + GEOM.belowH);
   });
+  // Second pass only: rows whose re-routed arrows need a wider channel under them grow by that much.
+  if (extra) for (const [lane, e] of extra) { const r = rowOf.get(lane); if (r !== undefined) rowH[r] += e; }
   const rowTop: number[] = []; rowH.reduce((acc, h, r) => { rowTop[r] = acc; return acc + h; }, 0);
   structures.forEach((s, i) => {
     const lane = laneFor[i], row = rowOf.get(lane)!, y = rowTop[row] + GEOM.tagH;
@@ -259,6 +262,9 @@ export function buildScene(event: TraceEvent, state: LayoutState): Scene {
     if (v.kind === 'ref' && boxes[v.id]) (tags[v.id] ??= []).push(label);
     else if (v.kind === 'scalar' && v.value === null && !nulls.includes(label)) nulls.push(label);
   }
+  const routed = route ? routeLinks(links, boxes, width, tags) : { maxX: 0, needs: new Map<number, number>() };   // route=false: layout state only, arrows get routed when the scene is shown
+  if (!extra && routed.needs.size) return buildScene(event, state, routed.needs);   // lay out again with room for the channels
+  width = Math.max(width, routed.maxX);
   const undrawn: { id: string; type: string }[] = []; // every captured object now has a box
   return { lanes, boxes, links, tags, nulls, cards: cardIds, undrawn, width, height: totalH + 40 };   // room for same-row arrows that drop under the row
 }
@@ -274,10 +280,18 @@ export function buildScenes(trace: Trace): Scene[] {
 // Layout only: it never reads or changes validated trace data.
 export interface SceneCache { get(i: number): Scene; step(max: number, ms?: number): boolean; built(): number }
 export function sceneCache(trace: Trace): SceneCache {
-  const state = newLayoutState(), scenes: Scene[] = [];
-  const upTo = (i: number) => { while (scenes.length <= i && scenes.length < trace.events.length) scenes.push(buildScene(trace.events[scenes.length], state)); };
+  const state = newLayoutState(), scenes: Scene[] = [], snaps: LayoutState[] = [], shown = new Map<number, Scene>();
+  const clone = (st: LayoutState): LayoutState => ({ laneOf: new Map(st.laneOf), headOf: new Map(st.headOf), rank: new Map(st.rank) });
+  // Scenes are laid out in order so lane choices carry forward, but arrow routing (the costly part) is done only for a scene that is asked for, from the lane state just before it.
+  const upTo = (i: number) => { while (scenes.length <= i && scenes.length < trace.events.length) { snaps.push(clone(state)); scenes.push(buildScene(trace.events[scenes.length], state, undefined, false)); } };
   return {
-    get(i) { upTo(i); return scenes[i]; },
+    get(i) {
+      upTo(i);
+      if (!snaps[i]) return scenes[i];   // out of range: same as before
+      let s = shown.get(i);
+      if (!s) { s = buildScene(trace.events[i], clone(snaps[i])); if (shown.size >= 64) shown.delete(shown.keys().next().value!); shown.set(i, s); }
+      return s;
+    },
     // One slice: at most `max` scenes and at most ~`ms` milliseconds, so big scenes never hold the page for long. True when everything is built.
     step(max, ms = 8) { const t0 = performance.now(); for (let k = 0; k < max && scenes.length < trace.events.length && (k === 0 || performance.now() - t0 < ms); k++) upTo(scenes.length); return scenes.length >= trace.events.length; },
     built: () => scenes.length,
@@ -308,6 +322,11 @@ export const cellCentre = (cell: number) => cell * GEOM.cell + GEOM.cell / 2;
 
 // SVG path for one arrow, in the coordinate space of its source box (so the arrow travels with its source).
 export function linkPath(link: Link, boxes: Record<string, Box>): string | null {
+  const routed = routeOf.get(link);
+  if (routed) return routed;
+  return basePath(link, boxes);
+}
+function basePath(link: Link, boxes: Record<string, Box>): string | null {
   const a = boxes[link.from], b = boxes[link.to];
   if (!a || !b) return null;
   if (a.kind === 'card' || b.kind === 'card' || link.port) {
@@ -367,3 +386,174 @@ export function laneSummary(lane: SceneLane, event: TraceEvent, scene: Scene): s
   const end = lane.end === 'null' ? 'None' : lane.end === 'cycle' ? `back to ${nodeDisplay(heap[lane.endTo!], linkField).main}` : lane.end === 'join' ? `joins ${lane.endTo}` : 'end';
   return `${lane.type} list ${lane.ids[0]}: ${[...parts, end].join(' → ')}`;
 }
+
+// ---- Arrow routing -------------------------------------------------------------------------------------------------
+// The default curve for a link is cheap but knows nothing about other boxes. After layout, any arrow whose curve would run
+// through a box that is neither its source nor its target is re-routed through a free channel: out of the source into the
+// gap under its row, along the gap to a vertical gutter right of every box, up or down the gutter, then into the target.
+// Each re-routed arrow gets its own gutter column and gap height, ordered so they do not cross each other where avoidable.
+const routeOf = new WeakMap<Link, string>();
+type Pt = { x: number; y: number };
+function sampleBase(d: string, a: Box): Pt[] {   // points of a single-cubic or line path, in absolute scene coordinates
+  const n = (d.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number), pts: Pt[] = [];
+  if (d.includes('C') && n.length >= 8) {
+    const [x0, y0, x1, y1, x2, y2, x3, y3] = n;
+    for (let i = 0; i <= 40; i++) { const t = i / 40, u = 1 - t; pts.push({ x: a.x + u * u * u * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3, y: a.y + u * u * u * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3 }); }
+  } else if (n.length >= 4) { pts.push({ x: a.x + n[0], y: a.y + n[1] }, { x: a.x + n[2], y: a.y + n[3] }); }
+  return pts;
+}
+const inside = (p: Pt, o: Box, m = 2) => p.x > o.x + m && p.x < o.x + o.w - m && p.y > o.y + m && p.y < o.y + o.h - m;
+function polyHits(pts: Pt[], boxes: Box[], skip: Set<string>): number {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const p of pts) { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; }
+  let hits = 0;
+  for (const o of boxes) {
+    if (o.x > x1 || o.x + o.w < x0 || o.y > y1 || o.y + o.h < y0 || skip.has(o.id)) continue;   // box outside the curve's bounding box
+    if (pts.some((p) => inside(p, o))) hits++;
+  }
+  return hits;
+}
+function rounded(pts: Pt[], a: Box, r = 7): string {   // polyline with rounded corners, in the source box's coordinates
+  const P = pts.map((p) => ({ x: p.x - a.x, y: p.y - a.y }));
+  let d = `M ${P[0].x} ${P[0].y}`;
+  for (let i = 1; i < P.length - 1; i++) {
+    const p0 = P[i - 1], p1 = P[i], p2 = P[i + 1];
+    const l1 = Math.hypot(p1.x - p0.x, p1.y - p0.y), l2 = Math.hypot(p2.x - p1.x, p2.y - p1.y), rr = Math.min(r, l1 / 2, l2 / 2);
+    if (rr < 0.5) { d += ` L ${p1.x} ${p1.y}`; continue; }
+    d += ` L ${p1.x + (p0.x - p1.x) / l1 * rr} ${p1.y + (p0.y - p1.y) / l1 * rr} Q ${p1.x} ${p1.y} ${p1.x + (p2.x - p1.x) / l2 * rr} ${p1.y + (p2.y - p1.y) / l2 * rr}`;
+  }
+  const e = P[P.length - 1]; return d + ` L ${e.x} ${e.y}`;
+}
+// Returns the right-most x the routed arrows need, so the caller can widen the scene.
+// Text that sits outside a box: the variable-name pill above it and the id caption / cell numbers under it.
+export type Label = Box & { owner: string };
+export function labelRects(boxes: Record<string, Box>, tags: Record<string, string[]>): Label[] {
+  const out: Label[] = [];
+  for (const b of Object.values(boxes)) {
+    out.push({ ...b, owner: b.id, id: `${b.id}:id`, kind: 'card', y: b.y + b.h, h: 20, w: b.kind === 'array' ? b.w : b.rec ? 150 : 44, rec: undefined, mainH: undefined });
+    const t = tags[b.id];
+    if (t?.length) out.push({ ...b, owner: b.id, id: `${b.id}:tag`, kind: 'card', y: b.y - 30, h: 26, w: Math.min(t.join(', ').length, 16) * 6.6 + 16, rec: undefined, mainH: undefined });
+  }
+  return out;
+}
+const segHits = (pts: Pt[], rects: Label[], skip: (r: Box) => boolean): boolean => {   // axis-aligned or diagonal segments against caption rectangles
+  for (let i = 1; i < pts.length; i++) {
+    const x0 = Math.min(pts[i].x, pts[i - 1].x), x1 = Math.max(pts[i].x, pts[i - 1].x), y0 = Math.min(pts[i].y, pts[i - 1].y), y1 = Math.max(pts[i].y, pts[i - 1].y);
+    for (const r of rects) {
+      if (r.x > x1 || r.x + r.w < x0 || r.y > y1 || r.y + r.h < y0 || skip(r)) continue;
+      const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 3);
+      for (let k = 0; k <= n; k++) { const q = { x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * k / Math.max(1, n), y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * k / Math.max(1, n) }; if (inside(q, r, 0)) return true; }
+    }
+  }
+  return false;
+};
+// Routing depends only on box geometry, the link list and the name pills, and most steps change none of them, so the last results are kept.
+const routeCache = new Map<string, { paths: (string | undefined)[]; maxX: number; needs: Map<number, number> }>();
+export function routeLinks(links: Link[], boxes: Record<string, Box>, sceneW: number, tags: Record<string, string[]> = {}): { maxX: number; needs: Map<number, number> } {
+  let sig = `${Math.round(sceneW)}|`;
+  for (const b of Object.values(boxes)) sig += `${b.id},${b.kind[0]},${Math.round(b.x)},${Math.round(b.y)},${b.w},${b.h},${b.lane}${b.rec ? 'r' : ''};`;
+  for (const l of links) sig += `${l.from}.${l.cell ?? ''}.${l.to}.${l.port ? `${l.port.x},${l.port.y}` : ''};`;
+  for (const k of Object.keys(tags)) sig += `${k}=${tags[k].join(',').length}|`;
+  const hit = routeCache.get(sig);
+  if (hit) { links.forEach((l, i) => { const d = hit.paths[i]; if (d) routeOf.set(l, d); }); return { maxX: hit.maxX, needs: hit.needs }; }
+  const out = routeLinksCompute(links, boxes, sceneW, tags);
+  if (routeCache.size >= 24) routeCache.delete(routeCache.keys().next().value!);
+  routeCache.set(sig, { paths: links.map((l) => routeOf.get(l)), maxX: out.maxX, needs: out.needs });
+  return out;
+}
+function routeLinksCompute(links: Link[], boxes: Record<string, Box>, sceneW: number, tags: Record<string, string[]>): { maxX: number; needs: Map<number, number> } {
+  const all = Object.values(boxes), needs = new Map<number, number>();
+  if (!all.length) return { maxX: 0, needs };
+  const maxRight = Math.max(sceneW - 28, ...all.map((o) => o.x + o.w));
+  type R = { link: Link; a: Box; b: Box; start: Pt; base: string };
+  const labels = labelRects(boxes, tags);
+  const srcCount = new Map<string, number>(); for (const l of links) srcCount.set(l.from, (srcCount.get(l.from) ?? 0) + 1);
+  const bad: R[] = [], good: { link: Link; a: Box; pts: Pt[] }[] = [];
+  for (const link of links) {
+    const a = boxes[link.from], b = boxes[link.to];
+    if (!a || !b || a === b) continue;
+    const base = basePath(link, boxes);
+    if (!base) continue;
+    const pts = sampleBase(base, a);
+    const fromArrayCell = a.kind === 'array' && !link.port;   // these leave the bottom edge, so a path that re-enters its own source is a fault too
+    const m = base.match(/^M\s+(-?[\d.]+)\s+(-?[\d.]+)/)!;
+    const r: R = { link, a, b, start: fromArrayCell ? { x: a.x + cellCentre(link.cell ?? 0), y: a.y + a.h + 20 } : { x: a.x + Number(m[1]), y: a.y + Number(m[2]) }, base };
+    let overCaption = false;
+    if (pts.length) {
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (const p of pts) { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; }
+      for (const o of labels) { if (o.owner === a.id || o.owner === b.id || o.x > x1 || o.x + o.w < x0 || o.y > y1 || o.y + o.h < y0) continue; if (pts.some((p) => inside(p, o, 0))) { overCaption = true; break; } }
+    }
+    if (pts.length && (polyHits(pts, all, new Set(fromArrayCell ? [b.id] : [a.id, b.id])) > 0 || overCaption)) bad.push(r);
+    else good.push({ link, a, pts: (srcCount.get(link.from) ?? 0) <= 8 ? densify(pts) : [] });
+    (r as R & { pts?: Pt[] }).pts = pts;
+  }
+  // Two arrows that run side by side for a long way are as unreadable as one through a box: send the later one through its own channel.
+  // Only small fans are checked (a 40-way fan from one array is spread by design and cannot all move into channels).
+  const perSource = new Map<string, number>(); for (const g of good) perSource.set(g.a.id, (perSource.get(g.a.id) ?? 0) + 1);
+  const small = (i: number) => (perSource.get(good[i].a.id) ?? 0) <= 8;
+  const grid = new Map<string, { i: number; x: number; y: number }[]>(), CELL = 6;
+  good.forEach((g, i) => { if (!small(i)) return; g.pts.forEach((p, k) => { if (k < 7 || k > g.pts.length - 8) return; const key = `${Math.floor(p.x / CELL)},${Math.floor(p.y / CELL)}`; (grid.get(key) ?? grid.set(key, []).get(key)!).push({ i, x: p.x, y: p.y }); }); });
+  const moved = new Set<number>();
+  good.forEach((g, i) => {
+    if (moved.has(i) || !small(i)) return;
+    const near = new Map<number, number>();
+    g.pts.forEach((p, k) => { if (k < 7 || k > g.pts.length - 8) return; const cx = Math.floor(p.x / CELL), cy = Math.floor(p.y / CELL), seen = new Set<number>();
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const q of grid.get(`${cx + dx},${cy + dy}`) ?? []) if (q.i > i && !moved.has(q.i) && !seen.has(q.i) && good[q.i].link.to !== g.link.to && Math.hypot(q.x - p.x, q.y - p.y) < 6) { seen.add(q.i); near.set(q.i, (near.get(q.i) ?? 0) + 1); } });
+    for (const [j, c] of near) if (c >= 14) moved.add(j);   // 14 samples x 6px is about 80px side by side, closer than 6px
+  });
+  // One source with a side-by-side pair sends all its arrows through channels, so they stay in one consistent family.
+  const movedSrc = new Set([...moved].map((j) => good[j].a.id));
+  good.forEach((g, j) => { if (movedSrc.has(g.a.id)) moved.add(j); });
+  for (const j of moved) { const g = good[j], a = g.a, link = g.link, b = boxes[link.to], fromArrayCell = a.kind === 'array' && !link.port, m = basePath(link, boxes)!.match(/^M\s+(-?[\d.]+)\s+(-?[\d.]+)/)!;
+    bad.push({ link, a, b, start: fromArrayCell ? { x: a.x + cellCentre(link.cell ?? 0), y: a.y + a.h + 20 } : { x: a.x + Number(m[1]), y: a.y + Number(m[2]) }, base: '' }); }
+  if (!bad.length) return { maxX: 0, needs };
+  // Gutter columns: arrows going up are ordered so the one reaching highest sits outermost; arrows going down so the lowest does.
+  const ty = (r: { b: Box }) => r.b.y + r.b.h / 2, up = (r: { a: Box; b: Box }) => r.b.y + r.b.h / 2 < r.a.y + r.a.h / 2;
+  const ordered = [...bad.filter(up).sort((p, q) => ty(q) - ty(p) || p.start.x - q.start.x), ...bad.filter((r) => !up(r)).sort((p, q) => ty(p) - ty(q) || q.start.x - p.start.x)];
+  const colStep = ordered.length > 60 ? 4 : ordered.length > 24 ? 6 : 8;
+  const perRow = new Map<number, number>(), seenRow = new Map<number, number>(), laneOfRow = new Map<number, number>();
+  // The channel runs under the whole row (the tallest box in it), not just under the source.
+  const rowBottom = (a: Box) => Math.max(a.y + a.h, ...all.filter((o) => Math.abs(o.y - a.y) < 1).map((o) => o.y + o.h));
+  for (const r of ordered) { const key = Math.round(rowBottom(r.a)); perRow.set(key, (perRow.get(key) ?? 0) + 1); laneOfRow.set(key, r.a.lane); }
+  // Channels need 6px each so neighbouring runs stay distinct lines. The free band under a row is 18px; a row with more arrows than that is made taller on the second layout pass.
+  for (const [key, n] of perRow) { const lane = laneOfRow.get(key)!, e = Math.max(0, n * 6 + 4 - 18); if (lane >= 0 && e > 0) needs.set(lane, Math.max(needs.get(lane) ?? 0, e)); }
+  // Arrows leaving one node each get their own column in the gap beside it (lower ports closest), so the first vertical runs do not coincide.
+  const stubIdx = new Map<Link, number>(), bySrc = new Map<string, R[]>();
+  for (const r of ordered) if (r.link.port || r.a.kind !== 'array') (bySrc.get(r.a.id) ?? bySrc.set(r.a.id, []).get(r.a.id)!).push(r);
+  for (const list of bySrc.values()) list.sort((p, q) => q.start.y - p.start.y).forEach((r, i) => stubIdx.set(r.link, Math.min(i, 6)));
+  // Top-edge entries into one row: the target furthest left runs highest, so the others drop under its run without crossing it.
+  const rowRightOf = (r: R) => all.some((o) => o.id !== r.b.id && o.id !== r.a.id && o.x >= r.b.x + r.b.w && o.y < r.b.y + r.b.h && o.y + o.h > r.b.y);
+  const topRank = new Map<Link, number>(), topRows = new Map<number, R[]>();
+  for (const r of ordered) if (rowRightOf(r)) (topRows.get(Math.round(r.b.y)) ?? topRows.set(Math.round(r.b.y), []).get(Math.round(r.b.y))!).push(r);
+  for (const list of topRows.values()) list.sort((p, q) => q.b.x - p.b.x || p.start.x - q.start.x).forEach((r, i) => topRank.set(r.link, i));
+  let maxX = maxRight;
+  ordered.forEach((r, k) => {
+    const gx = maxRight + 22 + k * colStep, key = Math.round(rowBottom(r.a)), n = perRow.get(key)!, j = seenRow.get(key) ?? 0; seenRow.set(key, j + 1);
+    const band = 18 + (r.a.lane >= 0 ? Math.max(0, n * 6 + 4 - 18) : 0), step = Math.min(6, band / Math.max(1, n)), gy = rowBottom(r.a) + 26 + (up(r) ? n - 1 - j : j) * step;
+    const pts: Pt[] = [r.start];
+    const leavesSide = r.link.port || r.a.kind !== 'array';
+    if (leavesSide) { const sx = r.a.x + r.a.w + 6 + (stubIdx.get(r.link) ?? 0) * 7; pts.push({ x: sx, y: r.start.y }, { x: sx, y: gy }); }
+    else pts.push({ x: r.start.x, y: gy });
+    pts.push({ x: gx, y: gy });
+    const yMid = r.b.y + r.b.h / 2, rowRight = rowRightOf(r);
+    if (!rowRight) pts.push({ x: gx, y: yMid }, { x: r.b.x + r.b.w + 2, y: yMid });   // free to the right of the target: enter its right edge
+    else {   // boxes sit to its right: come down onto its top edge, along whichever height clears the name pills
+      const ex = r.b.x + r.b.w - 10;
+      let best: Pt[] | null = null;
+      const rk = topRank.get(r.link) ?? 0;
+      for (const off of [8 + rk * 7, 4 + rk * 7, 12 + rk * 7]) { const t = [...pts, { x: gx, y: r.b.y - off }, { x: ex, y: r.b.y - off }, { x: ex, y: r.b.y - 3 }]; if (!segHits(t.slice(pts.length - 1), labels, (l) => l.id === `${r.b.id}:id` || l.id === `${r.a.id}:id`)) { best = t; break; } }
+      pts.splice(0, pts.length, ...(best ?? [...pts, { x: gx, y: r.b.y - 8 - rk * 7 }, { x: ex, y: r.b.y - 8 - rk * 7 }, { x: ex, y: r.b.y - 3 }]));
+    }
+    routeOf.set(r.link, rounded(pts, r.a));
+    maxX = Math.max(maxX, gx);
+  });
+  return { maxX: maxX + 28, needs };
+}
+// Resample a polyline to roughly 6px steps.
+function densify(pts: Pt[]): Pt[] {
+  const out: Pt[] = [];
+  for (let i = 1; i < pts.length; i++) { const n = Math.max(1, Math.ceil(Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y) / 6)); for (let k = 0; k < n; k++) out.push({ x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * k / n, y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * k / n }); }
+  if (pts.length) out.push(pts[pts.length - 1]);
+  return out;
+                                                                 }
