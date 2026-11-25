@@ -204,8 +204,11 @@ class Concurrency(unittest.TestCase):
     def test_slot_is_released_when_the_tracer_raises(self):
         with mock.patch.object(backend, "_slots", threading.BoundedSemaphore(1)), \
                 mock.patch.object(backend, "capture", side_effect=RuntimeError("boom")):
-            with self.assertRaises(RuntimeError):
-                post({"source": "x = 1"})
+            # A tracer bug is reported as a 500 (the server stays up), and the slot is released.
+            failed = post({"source": "x = 1"})
+            self.assertEqual(failed.status_code, 500)
+            self.assertEqual(failed.json()["error"]["code"], "tracer_failed")
+            self.assertNotIn("boom", failed.text)
         with mock.patch.object(backend, "_slots", threading.BoundedSemaphore(1)):
             self.assertEqual(post({"source": "x = 1"}).status_code, 200)
 
