@@ -24,7 +24,8 @@ const bytesOf = (s: string) => new TextEncoder().encode(s).length;
 export function RunPanel({ source, stdin, language, onSource, onStdin, onLanguage, onResult, collapsed = false, onToggleCollapsed }: { collapsed?: boolean; onToggleCollapsed?: () => void; source: string; stdin: string; language: Language; onSource: (s: string) => void; onStdin: (s: string) => void; onLanguage: (l: Language) => void; onResult: (raw: string, info: RunInfo) => void }) {
   const [backend, setBackend] = useState<Backend>({ state: 'checking' });
   const [examples, setExamples] = useState<ExampleProgram[]>([]);
-  const [events, setEvents] = useState(500), [timeout, setTimeoutSeconds] = useState(2);
+  const [events, setEvents] = useState(500), [timeoutChoice, setTimeoutSeconds] = useState<number | null>(null);
+  const timeout = timeoutChoice ?? (language === 'cpp' ? 5 : 2); // C++ is slower to record, so it starts at 5 s unless the user picks a limit
   const [running, setRunning] = useState(false), [message, setMessage] = useState(''), [info, setInfo] = useState<RunInfo | null>(null);
   const controller = useRef<AbortController | null>(null), runId = useRef(0);
 
