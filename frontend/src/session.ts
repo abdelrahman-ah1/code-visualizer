@@ -28,7 +28,7 @@ export function readEmbeddedSession(doc: Document): string | null {
 
 // A safe download name: letters, digits, dot, dash, underscore only.
 export function sessionFileName(label: string): string {
-  const base = label.replace(/\.trace\.json$|\.json$/i, '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '') || 'session';
+  const base = label.replace(/\.trace\.json(\.gz)?$|\.json(\.gz)?$/i, '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '') || 'session';
   return `${base.slice(0, 60)}.session.html`;
 }
 
