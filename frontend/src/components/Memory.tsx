@@ -17,6 +17,7 @@ export const Heap = memo(function Heap({ event }: { event: TraceEvent }) {
     {Object.entries(event.heap).map(([id, node]) => <article className="heap-node" id={`heap-${encodeURIComponent(id)}`} key={id}>
       <h3><span className="ref">{id}</span> <small>{node.type}{node.length !== undefined ? ` · length ${node.length}` : ''}{node.storage ? ` · ${node.storage}` : ''}{node.address ? ` · ${node.address}` : ''}</small></h3>
       {node.freed && <p className="warning" data-testid="freed-note">Freed: the program already released this memory. A pointer to it is dangling.</p>}
+      {node.orphan && <p className="warning" data-testid="orphan-note">Unreachable: no variable or object points here any more, but the program has not freed it. It is a leak unless the program still reaches it some other way.</p>}
       {node.opaque && <p className="hint">Opaque object. Internal data not captured.</p>}
       {node.items && <dl>{node.items.map((v, i) => <div className="binding" key={i}><dt>[{i}]</dt><dd><ValueView value={v}/></dd></div>)}</dl>}
       {node.entries && <dl>{node.entries.map(([k, v], i) => <div className="binding" key={i}><dt><ValueView value={k}/></dt><dd><ValueView value={v}/></dd></div>)}</dl>}
