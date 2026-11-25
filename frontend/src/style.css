@@ -76,7 +76,7 @@ footer { color:var(--muted); font-size:11px; border-top:1px solid var(--line); m
 .structure-scroll svg { display:block; max-width:none; }
 .vnode { transition:transform .35s ease; }
 .node-box,.cell-box { fill:var(--raised); stroke:var(--line); stroke-width:1.5; }
-.cell-box.omitted { stroke-dasharray:4 3; }
+.cell-box.omitted,.cell-box.empty { stroke-dasharray:4 3; }
 .node-divider { stroke:var(--line); stroke-width:1.5; }
 .node-main,.cell-value { fill:var(--ink); font:600 15px 'SFMono-Regular',Consolas,monospace; }
 .node-rest { fill:var(--muted); font:10px 'SFMono-Regular',Consolas,monospace; }

@@ -70,6 +70,7 @@ export interface Scene {
   lanes: SceneLane[]; boxes: Record<string, Box>; links: Link[];
   tags: Record<string, string[]>;   // heap id -> variable names pointing at it
   nulls: string[];                  // variables currently null
+  graph?: GraphSpec;
   cards: string[];                  // ids drawn as general object cards
   undrawn: { id: string; type: string }[]; // heap objects this view does not draw (see the Heap panel)
   width: number; height: number;
@@ -99,9 +100,10 @@ export function linkFieldsByType(heap: Record<string, HeapNode>): Map<string, st
 }
 
 export interface LayoutState { laneOf: Map<string, number>; headOf: Map<number, string>; rank: Map<string, number>;
-  tx: Map<string, number>; gx: Map<string, number>; tOrigin?: number; gOrigin?: number }   // M6: remembered tree and graph x positions (slot units) by object id
+  tx: Map<string, number>; gx: Map<string, number>; tOrigin?: number; gOrigin?: number;
+  graphTypes?: Map<string, string[]> }   // types that are neighbour-list graph vertices at some point in this trace (type -> list fields), so they are drawn as vertices from the first event   // M6: remembered tree and graph x positions (slot units) by object id
 export const newLayoutState = (): LayoutState => ({ laneOf: new Map(), headOf: new Map(), rank: new Map(), tx: new Map(), gx: new Map() });
-export const cloneLayoutState = (st: LayoutState): LayoutState => ({ laneOf: new Map(st.laneOf), headOf: new Map(st.headOf), rank: new Map(st.rank), tx: new Map(st.tx), gx: new Map(st.gx), tOrigin: st.tOrigin, gOrigin: st.gOrigin });
+export const cloneLayoutState = (st: LayoutState): LayoutState => ({ laneOf: new Map(st.laneOf), headOf: new Map(st.headOf), rank: new Map(st.rank), tx: new Map(st.tx), gx: new Map(st.gx), tOrigin: st.tOrigin, gOrigin: st.gOrigin, graphTypes: st.graphTypes });
 
 interface Structure { kind: 'list' | 'array'; ids: string[]; type: string; end?: SceneLane['end']; endTo?: string }
 
@@ -117,7 +119,7 @@ export const arrayOmitted = (n: HeapNode) => {
 // variable that points at it gets its name pill on the owning vertex. A list that two objects share is never hidden (the type then
 // keeps the plain array/card view). Items the recording cut off are counted on the vertex, never dropped silently.
 export interface GraphSpec { vertices: string[]; collapsed: Map<string, { owner: string; field: string }>; edgeFields: Map<string, string[]> }
-export function graphSpec(event: TraceEvent): GraphSpec {
+export function graphSpec(event: TraceEvent, known?: Map<string, string[]>): GraphSpec {
   const heap = event.heap, refs = new Map<string, number>(), bump = (v: Value) => { if (v.kind === 'ref') refs.set(v.id, (refs.get(v.id) ?? 0) + 1); };
   for (const n of Object.values(heap)) { Object.values(n.fields ?? {}).forEach(bump); (n.items ?? []).forEach(bump); (n.entries ?? []).forEach(([k, v]) => { bump(k); bump(v); }); }
   const cand = new Map<string, { ok: boolean; any: boolean; arrs: [string, string][]; type: string; field: string }>();
@@ -132,7 +134,9 @@ export function graphSpec(event: TraceEvent): GraphSpec {
     }
   }
   const edgeFields = new Map<string, string[]>(), collapsed = new Map<string, { owner: string; field: string }>();
-  for (const c of cand.values()) if (c.ok && c.any) { (edgeFields.get(c.type) ?? edgeFields.set(c.type, []).get(c.type)!).push(c.field); for (const [a, o] of c.arrs) collapsed.set(a, { owner: o, field: c.field }); }
+  for (const c of cand.values()) if (c.ok && (c.any || known?.get(c.type)?.includes(c.field))) { (edgeFields.get(c.type) ?? edgeFields.set(c.type, []).get(c.type)!).push(c.field); for (const [a, o] of c.arrs) collapsed.set(a, { owner: o, field: c.field }); }
+  // A type that is a graph later in the trace is a vertex from the start (its lists are still empty, or not assigned yet), unless one of its lists is shared or mixed now.
+  if (known) for (const [type, fields] of known) if (!edgeFields.has(type) && ![...cand.values()].some((c) => c.type === type && !c.ok)) edgeFields.set(type, fields);
   const vertices = Object.keys(heap).filter((id) => isRecord(heap[id]) && edgeFields.has(heap[id].type));
   return { vertices, collapsed, edgeFields };
 }
@@ -206,7 +210,7 @@ export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<nu
   // First-seen order keeps lane choice deterministic. IDs are encounter order, but we do not rely on that.
   for (const id of ids) if (!state.rank.has(id)) state.rank.set(id, state.rank.size);
   const rank = (id: string) => state.rank.get(id) ?? 0;
-  const gs = graphSpec(event), vertexSet = new Set(gs.vertices);
+  const gs = graphSpec(event, state.graphTypes), vertexSet = new Set(gs.vertices);
   const linkField = linkFieldsByType(heap);
   const field = (id: string) => linkField.get(heap[id].type);
   const listNodes = ids.filter((id) => { const f = field(id); return !vertexSet.has(id) && !!f && !!heap[id].fields && Object.hasOwn(heap[id].fields!, f); });
@@ -408,12 +412,18 @@ export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<nu
   if (!extra && routed.needs.size) return buildScene(event, state, routed.needs);   // lay out again with room for the channels
   width = Math.max(width, routed.maxX);
   const undrawn: { id: string; type: string }[] = []; // every captured object now has a box
-  return { lanes, boxes, links: graphLinks.length ? [...links, ...graphLinks] : links, tags, nulls, cards: [...cardIds, ...gs.vertices], undrawn, width, height: totalH + 40 };   // room for same-row arrows that drop under the row
+  return { lanes, boxes, links: graphLinks.length ? [...links, ...graphLinks] : links, tags, nulls, cards: [...cardIds, ...gs.vertices], graph: gs, undrawn, width, height: totalH + 40 };   // room for same-row arrows that drop under the row
 }
 
 // All scenes for a trace, built once in order so lane choices carry forward. Stepping backward just indexes this array.
+// Types that are graph vertices in at least one event of the trace. Scanned once per trace, so the drawing of a type never flips because its lists are empty at the start.
+export function graphTypesOf(trace: Trace): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const e of trace.events) { const gs = graphSpec(e); for (const [t, f] of gs.edgeFields) { const cur = out.get(t) ?? []; for (const x of f) if (!cur.includes(x)) cur.push(x); out.set(t, cur); } }
+  return out;
+}
 export function buildScenes(trace: Trace): Scene[] {
-  const state = newLayoutState();
+  const state = newLayoutState(); state.graphTypes = graphTypesOf(trace);
   return trace.events.map((e) => buildScene(e, state));
 }
 
@@ -425,7 +435,7 @@ export function sceneCache(trace: Trace): SceneCache {
   const state = newLayoutState(), scenes: Scene[] = [], snaps: LayoutState[] = [], shown = new Map<number, Scene>();
   const clone = cloneLayoutState;
   // Scenes are laid out in order so lane choices carry forward, but arrow routing (the costly part) is done only for a scene that is asked for, from the lane state just before it.
-  const upTo = (i: number) => { while (scenes.length <= i && scenes.length < trace.events.length) { snaps.push(clone(state)); scenes.push(buildScene(trace.events[scenes.length], state, undefined, false)); } };
+  const upTo = (i: number) => { while (scenes.length <= i && scenes.length < trace.events.length) { state.graphTypes ??= graphTypesOf(trace); snaps.push(clone(state)); scenes.push(buildScene(trace.events[scenes.length], state, undefined, false)); } };
   return {
     get(i) {
       upTo(i);
