@@ -154,3 +154,68 @@ describe('cost', () => {
     }
   });
 });
+
+describe('graph drawn the same way from the first event (arrows never end in empty space)', () => {
+  it('graph.py: every Vertex is a vertex card in every event, and every arrow ends on a drawn box', () => {
+    const t = load('graph'), scenes = buildScenes(t);
+    scenes.forEach((s, i) => {
+      for (const [id, n] of Object.entries(t.events[i].heap)) if (n.type === 'Vertex') expect(s.boxes[id]?.vertex, `event ${i} ${id}`).toBe(true);
+      for (const l of s.links) { const b = s.boxes[l.to]; expect(b && b.w > 0 && b.h > 0, `event ${i}: arrow to ${l.to} has no drawn box`).toBe(true); }
+      expect(Object.values(t.events[i].heap).some((n) => n.type.includes('list') && s.boxes[Object.keys(t.events[i].heap).find((k) => t.events[i].heap[k] === n)!]), `event ${i} must not draw the neighbour lists`).toBe(false);
+    });
+  });
+});
+
+describe('trace-wide graph types stay truthful', () => {
+  const lastIdx = (t: Trace) => t.events.length - 1;
+  const clone = (t: Trace): Trace => structuredClone(t);
+  const view = (s: ReturnType<typeof buildScene>) => Object.entries(s.boxes).map(([id, b]) => `${id}:${b.kind}:${b.vertex ? 'v' : '-'}`).sort().join(',');
+  it('eager buildScenes and lazy sceneCache (any seek order) draw every event the same', () => {
+    const t = load('graph'), eager = buildScenes(t).map(view), cache = sceneCache(t);
+    for (const i of [64, 3, 40, 0, 17, 63, 9, 30]) expect(view(cache.get(i)), `event ${i}`).toBe(eager[i]);
+    const fresh = sceneCache(t);
+    expect(view(fresh.get(12))).toBe(eager[12]);   // first ask is a middle event
+  });
+  it('early events show no edges that only exist later', () => {
+    const t = load('graph'), scenes = buildScenes(t);
+    expect(scenes[8].links).toHaveLength(0);
+    expect(scenes[8].graph!.collapsed.size).toBe(0);
+    const early = t.events.findIndex((e) => Object.values(e.heap).filter((n) => n.type === 'list').length === 1 && Object.keys(e.heap).length === 3);   // o1, its empty list, a fresh vertex
+    for (const l of scenes[Math.max(0, early)].links) expect(Object.keys(t.events[early].heap)).toContain(l.to);
+  });
+  it('a list that becomes shared falls back to the plain view in that event only', () => {
+    const t = clone(load('graph')), e = t.events[lastIdx(t)];
+    e.heap.o3.fields!.edges = { kind: 'ref', id: 'o2' };   // o1 and o3 now share one list
+    const s = buildScenes(t);
+    expect(s[lastIdx(t)].graph!.vertices).toHaveLength(0);
+    expect(s[20].graph!.vertices.length).toBeGreaterThan(0);
+  });
+  it('a mixed list (an object of another type inside) is not hidden as a neighbour list', () => {
+    const t = clone(load('graph')), e = t.events[lastIdx(t)];
+    e.heap.o99 = { type: 'Other', fields: { x: { kind: 'scalar', type: 'int', value: 1, truncated: false } } };
+    e.heap.o2.items!.push({ kind: 'ref', id: 'o99' }); e.heap.o2.length = e.heap.o2.items!.length;
+    const s = buildScenes(t);
+    expect(s[lastIdx(t)].graph!.collapsed.has('o2')).toBe(false);
+    expect(s[lastIdx(t)].boxes.o2?.kind).toBe('array');   // still drawn, nothing silently hidden
+  });
+  it('an unrelated empty list on a vertex type is still drawn, and an unrelated type with an edges list is not a vertex', () => {
+    const t = clone(load('graph'));
+    for (const e of t.events) {
+      if (e.heap.o1?.fields?.edges) { e.heap.o1.fields.log = { kind: 'ref', id: 'o90' }; e.heap.o90 = { type: 'list', items: [], length: 0 }; }
+      e.heap.o95 = { type: 'Other', fields: { edges: { kind: 'ref', id: 'o96' } } }; e.heap.o96 = { type: 'list', items: [], length: 0 };
+    }
+    const s = buildScenes(t);
+    for (const i of [12, 30, lastIdx(t)]) {
+      expect(s[i].boxes.o90?.kind, `event ${i}: log list must stay visible`).toBe('array');
+      expect(s[i].boxes.o95?.vertex, `event ${i}: other type is not a vertex`).not.toBe(true);
+      expect(s[i].boxes.o96?.kind, `event ${i}: other type's list stays drawn`).toBe('array');
+      expect(s[i].boxes.o2).toBeUndefined();   // the real neighbour list stays hidden
+    }
+  });
+  it('a program whose lists are always empty never becomes a graph: its empty lists stay visible', () => {
+    const t = clone(load('graph'));
+    for (const e of t.events) for (const n of Object.values(e.heap)) if (n.type === 'list') { n.items = []; n.length = 0; }
+    const s = buildScenes(t);
+    s.forEach((sc, i) => { expect(sc.graph!.vertices, `event ${i}`).toHaveLength(0); for (const [id, n] of Object.entries(t.events[i].heap)) if (n.type === 'list') expect(sc.boxes[id]?.kind, `event ${i}`).toBe('array'); });
+  });
+});
