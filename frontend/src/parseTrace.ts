@@ -41,10 +41,46 @@ function value(x: unknown, p: string, heap: Record<string, unknown>) {
 function bindings(x: unknown, p: string, heap: Record<string, unknown>) {
   Object.entries(record(x, p)).forEach(([k, v]) => value(v, `${p}.${k}`, heap));
 }
-export function parseTrace(raw: string): Trace {
+// EXPERIMENT (node-pool/1): a recording may store each distinct heap node once in `node_pool`, and each event's
+// `heap` as {nodeId: poolIndex}. This turns it back into the ordinary shape (the pooled node objects are shared, not
+// copied) so every check and the rest of the viewer run unchanged. Pool nodes are never edited afterwards.
+// Resource bound: all later checks and the UI work on the EXPANDED recording, so the work is bounded by the expanded
+// size, not the file size. A small file with a big node linked from many events could otherwise cost far more than any
+// ordinary file. The expanded size (sum of every linked node's JSON length) is therefore held to `maxExpandedBytes`,
+// which defaults to the same 20 MiB limit ordinary recordings have. Raising it for pooled files is a policy choice, not made here.
+export interface ParseOptions { maxExpandedBytes?: number }
+function expandNodePool(data: unknown, maxExpanded: number): unknown {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+  const t = data as Record<string, unknown>;
+  if (t.encoding === undefined && t.node_pool === undefined) return data;
+  if (t.encoding !== 'node-pool/1') fail('encoding', 'unsupported recording encoding');
+  const pool = array(t.node_pool, 'node_pool');
+  const events = array(t.events, 'events');
+  if (events.length > 10000) fail('events', 'more than the 10,000-event replay limit');
+  const weight: (number | undefined)[] = new Array(pool.length);   // JSON length of each pool node, computed on first use
+  let expanded = 0;
+  const out = events.map((raw, i) => {
+    const e = record(raw, `events[${i}]`);
+    const links = record(e.heap, `events[${i}].heap`);
+    const heap: Record<string, unknown> = {};
+    for (const [id, idx] of Object.entries(links)) {
+      if (typeof idx !== 'number' || !Number.isInteger(idx) || idx < 0 || idx >= pool.length) fail(`events[${i}].heap.${id}`, 'bad node pool index');
+      const k = idx as number;
+      const w = weight[k] ??= JSON.stringify(pool[k]).length;
+      expanded += w + id.length + 4;
+      if (expanded > maxExpanded) fail('File', `expands to more than the ${Math.round(maxExpanded / 1048576)} MiB replay limit once its pooled nodes are unpacked`);
+      Object.defineProperty(heap, id, { value: pool[k], enumerable: true, writable: true, configurable: true });   // own property even for "__proto__"
+    }
+    return { ...e, heap };
+  });
+  const { encoding: _e, node_pool: _p, ...rest } = t;
+  return { ...rest, events: out };
+}
+export function parseTrace(raw: string, opts: ParseOptions = {}): Trace {
   if (new TextEncoder().encode(raw).length > MAX_BYTES) fail('File', 'larger than the 20 MiB replay limit');
   let data: unknown;
   try { data = JSON.parse(raw); } catch { fail('File', 'not valid JSON'); }
+  data = expandNodePool(data, opts.maxExpandedBytes ?? MAX_BYTES);
   const t = record(data, 'Trace');
   if (t.schema_version !== 'codeviz.trace/1.0') fail('schema_version', 'supported version is codeviz.trace/1.0');
   text(t.source, 'source');
