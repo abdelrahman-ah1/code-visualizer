@@ -506,8 +506,10 @@ def capture_cpp(source, stdin="", timeout=5.0, max_events=500, max_output=8192):
             diags.append(diag("tracer", "warning", "timeout", stuck_line,
                               ("The program stayed on this line without finishing it (for %.1f seconds). This usually means an endless loop. Recording stopped." % step_budget)
                               if stuck_line else
+                              ("Recording stopped at its %.1f second time limit after %d steps, so the capture is incomplete. The steps shown are a valid beginning of the run. Raise the Time limit to record further; this alone does not show whether the program would finish." % (timeout, len(events)))
+                              if events else
                               "The program ran longer than %.1f seconds. Recording stopped; this can mean an endless loop." % timeout))
-        if check.get("timed_out") and final.get("status") != "timeout":
+        if check.get("timed_out"):
             diags.append(diag("sanitizer", "info", "check-timeout", None, "The separate memory-check run timed out, so it may have missed later problems."))
         diags = merge_runtime(diags)
         diags = dedupe(diags)[:MAX_DIAGNOSTICS]
