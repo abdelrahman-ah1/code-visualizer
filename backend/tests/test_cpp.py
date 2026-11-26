@@ -119,7 +119,8 @@ class Supported(unittest.TestCase):
         first = r["events"][0]
         self.assertEqual((first["event"], first["frames"][0]["function"]), ("call", "main"))
         by_line = [e for e in r["events"] if e["frames"][-1]["function"] == "main" and e["line"] == 6]
-        self.assertNotIn("r", by_line[0]["frames"][-1]["locals"])  # `int r` is not declared yet at the line before it runs
+        # `int r` has not stored a value at the line before it runs: it exists, flagged uninitialised, with no value drawn
+        self.assertEqual(by_line[0]["frames"][-1]["locals"]["r"], {"kind": "opaque", "type": "uninitialised int"})
 
     def test_tree_has_left_and_right(self):
         r = run("tree")
@@ -493,6 +494,45 @@ class ErrorsAndLimits(unittest.TestCase):
                 self.assertFalse(node.get("items"), "phantom cells drawn for a vector that is not constructed")
         self.assertGreater(drawn, 0, "the vector was never drawn")
         self.assertNotIn("items", r["events"][-1].get("truncated", []))
+
+    def test_scalar_is_flagged_uninitialised_until_its_declaration_stores_a_value(self):
+        """`int n = (int)v.size();` stops on its own line twice (before the call, then again after it returns, before the
+        store). n holds stack garbage at both stops: it must be drawn as uninitialised, never as a number."""
+        src = (
+            "#include <vector>\n"
+            "int main() {\n"
+            "    std::vector<int> v = {1, 2, 3};\n"
+            "    int n = (int)v.size();\n"
+            "    return n - 3;\n"
+            "}\n")
+        want = {"kind": "opaque", "type": "uninitialised int"}
+        runs = [cpp_trace.capture_cpp(src, "", 8.0, 300) for _ in range(2)]
+        for r in runs:
+            self.assertEqual(r["status"], "ok")
+            at_decl = [ev for ev in r["events"] if ev["frames"] and ev["frames"][-1]["line"] == 4]
+            self.assertTrue(at_decl)
+            for ev in at_decl:
+                self.assertEqual(ev["frames"][-1]["locals"]["n"], want)
+            after = [ev for ev in r["events"] if ev["frames"] and ev["frames"][-1]["line"] == 5]
+            self.assertEqual(after[0]["frames"][-1]["locals"]["n"]["value"], 3)
+        # no stack garbage anywhere, so two runs record identically
+        self.assertEqual(json.dumps(runs[0]["events"], sort_keys=True), json.dumps(runs[1]["events"], sort_keys=True))
+
+    def test_loop_header_variable_is_hidden_first_time_and_shown_when_it_comes_round(self):
+        """The rule must not hide a `for` variable on later passes over its header line."""
+        src = (
+            "int main() {\n"
+            "    int s = 0;\n"
+            "    for (int i = 0; i < 3; i++) {\n"
+            "        s += i;\n"
+            "    }\n"
+            "    return s - 3;\n"
+            "}\n")
+        r = cpp_trace.capture_cpp(src, "", 8.0, 300)
+        self.assertEqual(r["status"], "ok")
+        header = [ev["frames"][-1]["locals"] for ev in r["events"] if ev["frames"] and ev["frames"][-1]["line"] == 3]
+        self.assertNotIn("i", header[0], "i drawn before its declaration ran")
+        self.assertEqual([h["i"]["value"] for h in header[1:] if "i" in h], [0, 1, 2])
 
     def test_destroyed_library_objects_do_not_show_freed_buffer_garbage(self):
         """After a vector or string is destroyed at scope end its buffer is freed; it must not be read as if still live."""
