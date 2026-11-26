@@ -255,6 +255,9 @@ class Encoder:
                 if i >= MAX_LOCALS:
                     self.truncated.append("locals")
                     break
+                if isinstance(v, Uninitialised):     # exists, holds no value yet: shown as such, never as stack garbage
+                    local[n] = {"kind": "opaque", "type": "uninitialised " + v.type_name}
+                    continue
                 local[n] = self.value(v, 0)
             out.append({"depth": depth, "function": name, "line": line, "locals": local})
         if ret is not None:
@@ -712,10 +715,35 @@ def user_frames():
     return out
 
 
-def frame_bindings(frame, visited):
+class Uninitialised:
+    """Stands in for a scalar local whose declaration is the current line and has not stored its value yet."""
+    def __init__(self, type_name):
+        self.type_name = type_name
+
+
+def _stored_after_initialiser(sym, block):
+    """True for a scalar declared in the function's own block: `int n = f();` stores n only after f returns, so a stop
+    back on that line after the call is still before n is set. A class object (std::string, vector, a struct returned by
+    value) is built in place by the call itself and is live once it returns; a variable in a nested block (a `for` header)
+    is set before the body that shares its line runs. Both keep the older rule."""
+    try:
+        if block.function is None:
+            return False
+        return sym.type.strip_typedefs().code in (gdb.TYPE_CODE_INT, gdb.TYPE_CODE_FLT, gdb.TYPE_CODE_PTR,
+                                                  gdb.TYPE_CODE_ENUM, gdb.TYPE_CODE_BOOL, gdb.TYPE_CODE_CHAR)
+    except (gdb.error, RuntimeError, AttributeError):
+        return False
+
+
+def frame_bindings(frame, visited, run_revisit=None):
     """Locals in scope at this frame's line. A variable declared on the current line only counts once the
-    line has been visited before in this call (a `for` header coming round again); the first time, it is not set yet."""
+    line has been visited before in this call (a `for` header coming round again); the first time, it is not set yet.
+    run_revisit says whether the current run of stops on this line began on a revisit. Execution that moves forward through
+    one line (a call inside the initialiser returns, then the store happens) is the same run, so the variable stays unset.
+    That holds only where _stored_after_initialiser says so; everything else keeps the older rule."""
     line = frame.find_sal().line
+    if run_revisit is None:
+        run_revisit = line in visited
     seen, out, decl = set(), [], []
     block = frame.block()
     while block is not None and not (block.is_global or block.is_static):
@@ -725,9 +753,17 @@ def frame_bindings(frame, visited):
             n = sym.print_name
             if n in seen or n.startswith("__"):
                 continue
-            if sym.is_variable and sym.line and sym.addr_class != gdb.SYMBOL_LOC_STATIC and (
-                    sym.line > line or (sym.line == line and line not in visited)):
-                continue  # declared further down: its memory is not initialised yet
+            if sym.is_variable and sym.line and sym.addr_class != gdb.SYMBOL_LOC_STATIC and sym.line > line:
+                continue  # declared further down: not in scope yet
+            if sym.is_variable and sym.line and sym.addr_class != gdb.SYMBOL_LOC_STATIC and sym.line == line:
+                if _stored_after_initialiser(sym, block):
+                    if not run_revisit:       # its own declaration has not stored a value yet: say so, draw no value
+                        seen.add(n)
+                        decl.append((n, sym))
+                        out.append((n, Uninitialised(pretty(str(sym.type.unqualified())))))
+                        continue
+                elif line not in visited:
+                    continue  # declared on this line and not set yet (a class object is live once its constructor returned)
             if sym.is_variable and sym.line and sym.addr_class != gdb.SYMBOL_LOC_STATIC and sym.line < line and visited and max(visited) < sym.line:
                 continue  # an early return skipped its declaration (the stop is reported at the closing brace): never set in this call
             seen.add(n)
@@ -794,7 +830,7 @@ def capture_state(chain, ret=None):
         specs.append(("<globals>", ordered[0].find_sal().line if False else GLOBALS_LINE[0], globs))
     for f in ordered:
         fn = f.function()
-        specs.append((short_name(fn.print_name if fn is not None else "??"), f.find_sal().line, frame_bindings(f, VISITED.get(len(specs) - (1 if globs else 0), set()))))
+        specs.append((short_name(fn.print_name if fn is not None else "??"), f.find_sal().line, frame_bindings(f, VISITED.get(len(specs) - (1 if globs else 0), set()), RUN_REVISIT.get(len(specs) - (1 if globs else 0)))))
     # The binding values were read lazily; encode now, while the program is stopped.
     specs = [(n, ln, [(k, v) for k, v in b if v is not None]) for n, ln, b in specs]
     return ENC.snapshot(specs, ret)
@@ -803,6 +839,8 @@ def capture_state(chain, ret=None):
 GLOBALS_LINE = [1]
 ACT = {}       # call-stack index -> number of activations seen there (a new call bumps it)
 VISITED = {}   # call-stack index -> lines already executed in that activation
+RUN_REVISIT = {}   # call-stack index -> whether the current run of stops on its line began on a revisit
+RUN_STATE = {}     # call-stack index -> (line, pc) of the last stop, to tell "moving forward in the same line" from a new pass
 
 # ---------------------------------------------------------------- output files
 class Streams:
@@ -1124,6 +1162,18 @@ def run():
                     k = dead
             for stale in [d for d in VISITED if d >= k]:
                 del VISITED[stale]               # activations above the shared part are new or gone
+            for stale in [d for d in list(RUN_STATE) if d >= k]:
+                del RUN_STATE[stale]
+                RUN_REVISIT.pop(stale, None)
+            top_idx = len(cur) - 1
+            try:
+                top_pc = top.pc()
+            except gdb.error:
+                top_pc = 0
+            last = RUN_STATE.get(top_idx)
+            if last is None or last[0] != line or top_pc <= last[1]:
+                RUN_REVISIT[top_idx] = line in VISITED.get(top_idx, set())      # a new pass over this line
+            RUN_STATE[top_idx] = (line, top_pc)
             if len(cur) > k:
                 ACT[len(cur) - 1] = ACT.get(len(cur) - 1, 0) + 1
             if len(cur) > k:
