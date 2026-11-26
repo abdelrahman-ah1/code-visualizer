@@ -25,5 +25,8 @@ jobs:
         working-directory: frontend
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
+      # The backend web server must run under the venv that has uvicorn and FastAPI, not the system python3.
       - run: npx playwright test
         working-directory: frontend
+        env:
+          CODEVIZ_PYTHON: ${{ github.workspace }}/.venv/bin/python
