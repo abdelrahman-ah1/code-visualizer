@@ -87,7 +87,7 @@ test('desktop and phone layouts in both themes', async ({ page }) => {
     for (const theme of ['dark','light']) {
       if (theme === 'light') await page.getByRole('button',{name:'Light mode',exact:true}).click();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      await page.screenshot({path:`/downloads/m2-${width}-${theme}.png`,fullPage:true});
+      await page.screenshot({path:test.info().outputPath(`m2-${width}-${theme}.png`),fullPage:true});
       if (theme === 'light') await page.getByRole('button',{name:'Dark mode',exact:true}).click();
     }
   }
@@ -119,8 +119,8 @@ test('error and before-line visual states', async ({ page }) => {
   await page.getByRole('button',{name:'Explore alias example'}).click();
   await page.getByRole('button',{name:'Last',exact:true}).click();
   await page.getByRole('button',{name:'Previous',exact:true}).click();
-  await page.screenshot({path:'/downloads/m2-before-line.png',fullPage:true});
+  await page.screenshot({path:test.info().outputPath('m2-before-line.png'),fullPage:true});
   await page.locator('input[type=file]').setInputFiles({name:'bad.json',mimeType:'application/json',buffer:Buffer.from('{')});
   await expect(page.getByRole('alert')).toContainText('not valid JSON');
-  await page.screenshot({path:'/downloads/m2-error.png',fullPage:true});
+  await page.screenshot({path:test.info().outputPath('m2-error.png'),fullPage:true});
 });
