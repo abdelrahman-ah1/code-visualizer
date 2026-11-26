@@ -181,10 +181,10 @@ class Concurrency(unittest.TestCase):
         started, release = threading.Event(), threading.Event()
         real = backend.capture
 
-        def slow(*args):
+        def slow(*args, **kwargs):
             started.set()
             release.wait(5)
-            return real(*args)
+            return real(*args, **kwargs)
 
         with mock.patch.object(backend, "_slots", threading.BoundedSemaphore(1)), \
                 mock.patch.object(backend, "capture", slow):

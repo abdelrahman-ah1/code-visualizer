@@ -381,16 +381,19 @@ class ErrorsAndLimits(unittest.TestCase):
         r = run("infinite_loop", timeout=3.0)
         self.assertEqual((r["status"], r["complete"]), ("timeout", False))
         self.assertEqual(diag(r, "timeout")["line"], 4)
+        self.assertEqual(r["limit_hit"]["kind"], "step_time")   # one line that never ends, not the whole-run clock
         self.assertLess(time.time() - t0, 3.0 + 5)
 
     def test_endless_recursion_hits_frame_limit(self):
         r = run("stack_overflow")
         self.assertEqual(r["status"], "trace_limit")
         self.assertIn("deeper than 32", diag(r, "trace-limit")["message"])
+        self.assertEqual(r["limit_hit"], {"kind": "stack_depth", "limit": 32})
 
     def test_event_limit(self):
         r = run("big_output", max_events=50)
         self.assertEqual((r["status"], len(r["events"])), ("trace_limit", 50))
+        self.assertEqual(r["limit_hit"], {"kind": "events", "limit": 50})
 
     def test_local_declared_after_an_early_return_is_not_shown(self):
         """A local whose declaration was skipped by an early return holds garbage; it must not appear or be followed."""
@@ -530,6 +533,7 @@ class ErrorsAndLimits(unittest.TestCase):
         self.assertEqual((r["status"], r["complete"]), ("trace_limit", False))
         self.assertNotIn("worker-failed", [d["kind"] for d in r["diagnostics"]])
         self.assertIn("file limit", diag(r, "trace-limit")["message"])
+        self.assertEqual(r["limit_hit"]["kind"], "recording_size")
         n = len(r["events"])
         self.assertTrue(0 < n < len(full["events"]))
         # the kept beginning is the real beginning of the run, not a damaged or reordered one
