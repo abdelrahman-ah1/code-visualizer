@@ -422,6 +422,14 @@ class Encoder:
             return {"kind": "opaque", "type": "unreadable (" + str(exc)[:60] + ")"}
 
     def _value(self, v, depth):
+        # libstdc++'s printer for std::vector<bool> yields plain Python bools, because a bit in the
+        # packed backing word has no addressable gdb.Value. Native scalars from printers are real
+        # values, so encode them directly instead of assuming gdb.Value. (bool before int:
+        # isinstance(True, int) is True.)
+        if isinstance(v, bool):
+            return {"kind": "scalar", "type": "bool", "value": v}
+        if isinstance(v, int):
+            return {"kind": "scalar", "type": "int", "value": v}
         t = v.type.strip_typedefs()
         code = t.code
         tname = pretty(str(v.type.unqualified()))
