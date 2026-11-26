@@ -180,10 +180,13 @@ export function pointerToVertex(link: Link, boxes: Record<string, Box>): string 
   return `M ${L(s)} C ${L(c1)}, ${L(c2)}, ${L(e)}`;
 }
 const clipToBox = (b: Box, tx: number, ty: number, margin: number, shiftX = 0): Pt => {   // point on b's border towards (tx, ty), pushed out by margin
-  const cx = b.x + b.w / 2 + shiftX, cy = b.y + b.h / 2, dx = tx - cx, dy = ty - cy;
+  // The line is aimed from a point shifted right of the centre (clear of the variable-name pill), but it must still
+  // stop `margin` outside the box itself. Shifting the whole rectangle instead left the arrow end up to 19 px off the border.
+  const cx = b.x + b.w / 2, cy = b.y + b.h / 2, hw = b.w / 2 + margin, hh = b.h / 2 + margin;
+  const ox = cx + Math.max(-hw + 4, Math.min(hw - 4, shiftX)), dx = tx - ox, dy = ty - cy;
   if (!dx && !dy) return { x: cx, y: b.y };
-  const t = Math.min(dx ? (b.w / 2 + margin) / Math.abs(dx) : Infinity, dy ? (b.h / 2 + margin) / Math.abs(dy) : Infinity);
-  return { x: cx + dx * t, y: cy + dy * t };
+  const t = Math.min(dx > 0 ? (cx + hw - ox) / dx : dx < 0 ? (cx - hw - ox) / dx : Infinity, dy > 0 ? hh / dy : dy < 0 ? -hh / dy : Infinity);
+  return { x: ox + dx * t, y: cy + dy * t };
 };
 // A vertex-to-vertex edge: a straight line from border to border; when it would cross another box it bends (a quadratic curve) the
 // smallest amount that clears every box. If nothing clears, the straight line stays.

@@ -16,6 +16,8 @@ const examples = ['01_scalars', '02_loop', '03_recursion', '04_list_mutation', '
 
 // The editor draft survives a page refresh. It stays in this browser (localStorage), is never
 // sent anywhere except to the local backend when you press Run, and is not part of exports.
+// Stands in for the recording text when it arrived pooled (the parsed trace is kept; plain 1.0 text is rebuilt on save).
+const REBUILD_ON_SAVE = '\u0000pooled';
 const DRAFT_KEY = 'codeviz.draft.v1';
 const STARTERS: Record<Language, string> = {
   python: 'a = [1]\nb = a\nb.append(2)\nprint(a)\n',
@@ -57,7 +59,8 @@ export function App() {
     if (id !== revision.current) return;
     try {
       const t0 = performance.now(), next = parseTrace(raw), ms = performance.now() - t0;
-      rawText.current = raw; setTrace(next); setName(label); setLoaded(id); setRanSource(fromRun ? next.source : null); if (fromRun) { setEditorOpen(false); const go = () => (document.querySelector('.replay-root') ?? document.getElementById('replay'))?.scrollIntoView({ block: 'start' }); setTimeout(go, 150); setTimeout(go, 700); } // after a run, the editor folds away so the replay fits the screen
+      // A pooled recording is not kept as text (the parsed trace is enough): the plain 1.0 text is rebuilt when someone saves.
+      rawText.current = raw.includes('"encoding":"node-pool/') ? REBUILD_ON_SAVE : raw; setTrace(next); setName(label); setLoaded(id); setRanSource(fromRun ? next.source : null); if (fromRun) { setEditorOpen(false); const go = () => (document.querySelector('.replay-root') ?? document.getElementById('replay'))?.scrollIntoView({ block: 'start' }); setTimeout(go, 150); setTimeout(go, 700); } // after a run, the editor folds away so the replay fits the screen
       setRunStats(`${next.events.length.toLocaleString()} events validated in ${Math.max(1, Math.round(ms))} ms`);
       if (!fromRun) setBreakpoints(new Set()); // a different program: old line numbers mean nothing
     }
@@ -127,11 +130,13 @@ export function App() {
     if (!trace || !rawText.current) return;
     setNotice('');
     try {
-      const blob = await gzipText(rawText.current), fileName = sessionFileName(name).replace(/\.session\.html$/, GZIP_EXT);
+      // A recording that arrived pooled (node-pool/2 from Run) is saved as the plain 1.0 shape, so the saved file opens everywhere v1.0 does.
+      const plain = rawText.current === REBUILD_ON_SAVE ? JSON.stringify(trace) : rawText.current;
+      const blob = await gzipText(plain), fileName = sessionFileName(name).replace(/\.session\.html$/, GZIP_EXT);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setNotice(`Saved ${fileName} (${(blob.size / 1048576).toFixed(2)} MiB, from ${(rawText.current.length / 1048576).toFixed(2)} MiB). ${SHARE_NOTICE}`);
+      setNotice(`Saved ${fileName} (${(blob.size / 1048576).toFixed(2)} MiB, from ${(plain.length / 1048576).toFixed(2)} MiB). ${SHARE_NOTICE}`);
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not compress this recording.'); }
   }
   // EXPERIMENT: same recording in node-pool/1 form (each distinct node once). Falls back to the ordinary text if the check fails or it is not smaller.
@@ -139,12 +144,13 @@ export function App() {
     if (!trace || !rawText.current) return;
     setNotice('');
     try {
-      const packed = encodeNodePool(trace, rawText.current);
+      const plainText = rawText.current === REBUILD_ON_SAVE ? JSON.stringify(trace) : rawText.current, plainSize = plainText.length;
+      const packed = encodeNodePool(trace, plainText);
       const blob = await gzipText(packed.text), fileName = sessionFileName(name).replace(/\.session\.html$/, '.pooled' + GZIP_EXT);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setNotice(`Saved ${fileName} (${(blob.size / 1048576).toFixed(2)} MiB, from ${(rawText.current.length / 1048576).toFixed(2)} MiB${packed.pooled ? ', node-pool format' : ': ' + packed.reason}). ${SHARE_NOTICE}`);
+      setNotice(`Saved ${fileName} (${(blob.size / 1048576).toFixed(2)} MiB, from ${(plainSize / 1048576).toFixed(2)} MiB${packed.pooled ? ', node-pool format' : ': ' + packed.reason}). ${SHARE_NOTICE}`);
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not compress this recording.'); }
   }
   const stale = trace && ranSource !== null && ranSource !== draft.source;

@@ -1,5 +1,6 @@
 import type { Trace } from './types';
-// EXPERIMENT: writer for the node-pool/1 recording format (reader lives in parseTrace.ts).
+import { expandNodePool } from './parseTrace';
+// EXPERIMENT: writer for the node-pool/2 recording format (the reader also accepts node-pool/1) (reader lives in parseTrace.ts).
 // A node is stored once; each event's heap becomes {nodeId: poolIndex}. Equality of two nodes is equality of their
 // complete canonical text (keys sorted), compared by the Map, so there is no digest and no collision possibility.
 function canon(x: unknown): string {
@@ -18,15 +19,29 @@ export function encodeNodePool(trace: Trace, rawFull: string): Pooled {
       if (i === undefined) { i = pool.length; index.set(key, i); pool.push(node); }
       Object.defineProperty(links, id, { value: i, enumerable: true, writable: true, configurable: true });
     }
-    return { ...e, heap: links };
+    return { ...e, heap: links } as Record<string, unknown>;
   });
-  const out = { ...trace, events, encoding: 'node-pool/1', node_pool: pool };
+  // node-pool/2 extras. Frames: each distinct frame list once. Output: cumulative stdout/stderr become lengths into the
+  // final text, but only when every event's text is a prefix of the last one (otherwise that stream stays as written).
+  const framePool: unknown[] = [], frameIndex = new Map<string, number>();
+  trace.events.forEach((e, n) => {
+    const key = canon(e.frames); let i = frameIndex.get(key);
+    if (i === undefined) { i = framePool.length; frameIndex.set(key, i); framePool.push(e.frames); }
+    events[n].frames = i;
+  });
+  const extra: Record<string, string> = {};
+  const lastEvent = trace.events[trace.events.length - 1];
+  for (const k of ['stdout', 'stderr'] as const) {
+    if (!lastEvent || !trace.events.every((e) => typeof e[k] === 'string' && lastEvent[k].startsWith(e[k]))) continue;
+    extra[`${k}_text`] = lastEvent[k];
+    trace.events.forEach((e, n) => { events[n][k] = e[k].length; });
+  }
+  const out = { ...trace, events, encoding: 'node-pool/2', node_pool: pool, frame_pool: framePool, ...extra };
   const text = JSON.stringify(out);
   // Check before use: unpacking what was just written must give back exactly the recording that was loaded.
   let ok = false;
   try {
-    const back = JSON.parse(text) as { events: { heap: Record<string, number> }[]; node_pool: unknown[] };
-    const rebuilt = back.events.map((e) => ({ ...e, heap: Object.fromEntries(Object.entries(e.heap).map(([id, i]) => [id, back.node_pool[i]])) }));
+    const rebuilt = (expandNodePool(JSON.parse(text), Infinity) as { events: unknown[] }).events;   // the real reader, so the check covers what will be read back
     ok = canon(rebuilt) === canon(trace.events);
   } catch { ok = false; }
   if (!ok) return { text: rawFull, pooled: false, uniqueNodes: pool.length, reason: 'check failed, wrote the ordinary format' };

@@ -22,7 +22,9 @@ export interface TraceEvent {
   unreached_heap?: { count: number; bytes: number };
 }
 export type RunStatus = 'ok' | 'error' | 'timeout' | 'trace_limit' | 'output_limit' | 'unsupported' | 'worker_error';
+export type LimitKind = 'events' | 'objects' | 'stack_depth' | 'output_chars' | 'wall_time' | 'step_time' | 'cpu_time' | 'memory' | 'recording_size';
 export interface Trace {
+  limit_hit?: { kind: LimitKind; limit?: number };   // which limit ended the run, when one did
   schema_version: 'codeviz.trace/1.0'; source: string;
   runtime: { implementation: string; version: string };
   limits: { wall_seconds: number; events: number; output_chars: number };
