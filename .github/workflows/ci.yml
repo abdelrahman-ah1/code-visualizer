@@ -1,0 +1,28 @@
+# Runs every check on each push and pull request: backend tests (including the C++ recorder and the
+# trace integrity check), type check, unit tests, and the browser tests (including the arrow layout check).
+# Not yet run on GitHub: first run may need small fixes (apt package names, browser install).
+name: ci
+on: [push, pull_request]
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: sudo apt-get update && sudo apt-get install -y g++ gdb
+      - run: pip install -r backend/requirements.txt pytest
+      - run: python -m pytest -q test_trace.py backend/tests
+      - run: npm ci
+        working-directory: frontend
+      - run: npx tsc --noEmit
+        working-directory: frontend
+      - run: npx vitest run
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: npx playwright test
+        working-directory: frontend
