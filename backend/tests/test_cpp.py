@@ -458,6 +458,42 @@ class ErrorsAndLimits(unittest.TestCase):
         # and the recording is repeatable (the garbage value used to differ from run to run)
         self.assertEqual(json.dumps(runs[0]["events"], sort_keys=True), json.dumps(runs[1]["events"], sort_keys=True))
 
+    def test_uninitialised_vector_shows_no_phantom_cells(self):
+        """A vector whose three pointers are stale bytes (not constructed yet) must be drawn empty, not as invented cells.
+
+        The stale words here point at readable stack memory with end < begin, so libstdc++'s printer would happily yield
+        cells (it walks from begin until it meets end, which never happens); the tracer must refuse to draw them."""
+        src = (
+            "#include <vector>\n"
+            "#include <cstdint>\n"
+            "#include <cstring>\n"
+            "int main() {\n"
+            "    std::vector<int> v;\n"
+            "    std::uint64_t saved[3];\n"
+            "    std::uint64_t w[3];\n"
+            "    std::memcpy(saved, (void*)&v, sizeof saved);\n"
+            "    w[0] = (std::uint64_t)&w[0];\n"
+            "    w[1] = w[0] - 8;\n"
+            "    w[2] = w[0] + 64;\n"
+            "    std::memcpy((void*)&v, w, sizeof w);\n"
+            "    int n = 1;\n"
+            "    n = n + 1;\n"
+            "    std::memcpy((void*)&v, saved, sizeof saved);\n"
+            "    return n - 2;\n"
+            "}\n")
+        r = cpp_trace.capture_cpp(src, "", 8.0, 300)
+        self.assertEqual(r["status"], "ok")
+        drawn = 0
+        for ev in r["events"]:
+            loc = ev["frames"][-1]["locals"] if ev["frames"] else {}
+            v = loc.get("v")
+            if v and v.get("kind") == "ref":
+                node = ev["heap"][v["id"]]
+                drawn += 1
+                self.assertFalse(node.get("items"), "phantom cells drawn for a vector that is not constructed")
+        self.assertGreater(drawn, 0, "the vector was never drawn")
+        self.assertNotIn("items", r["events"][-1].get("truncated", []))
+
     def test_destroyed_library_objects_do_not_show_freed_buffer_garbage(self):
         """After a vector or string is destroyed at scope end its buffer is freed; it must not be read as if still live."""
         src = (
