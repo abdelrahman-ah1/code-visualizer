@@ -16,7 +16,10 @@ import json
 import os
 from pathlib import Path
 import re
-import resource
+try:
+    import resource   # Unix only: there is no such module on Windows
+except ImportError:
+    resource = None
 import shutil
 import signal
 import subprocess
@@ -106,7 +109,12 @@ def diag(source, severity, kind, line, message, column=None, extra=None):
 
 
 # ---------------------------------------------------------------- toolchain discovery
+NATIVE_WINDOWS = os.name == "nt"   # C++ mode needs Unix (gdb under ptrace, setsid, rlimits, process groups); on Windows use WSL2
+
+
 def find_tools():
+    if NATIVE_WINDOWS:
+        return None, None   # reported as toolchain missing, even if a Windows g++ or gdb happens to be on PATH
     env_gdb = os.environ.get("CODEVIZ_GDB")
     gdb = env_gdb or shutil.which("gdb")
     gpp = os.environ.get("CODEVIZ_GPP") or shutil.which("g++")
@@ -359,6 +367,12 @@ def capture_cpp(source, stdin="", timeout=5.0, max_events=500, max_output=8192):
         raise ValueError("Limits out of range")
     gdb_path, gpp = find_tools()
     runtime = {"implementation": "g++ + gdb", "version": "unavailable"}
+    if NATIVE_WINDOWS:
+        r = base_result(source, timeout, max_events, max_output, runtime)
+        r.update(events=[], status="worker_error", complete=False,
+                 diagnostics=[diag("toolchain", "error", "unsupported-platform", None,
+                                   "C++ tracing does not run on native Windows (it needs gdb under Linux). Use WSL2 (see WSL_SETUP.md), or record Python here.")])
+        return r
     if not gdb_path or not gpp:
         missing = [n for n, p in (("g++", gpp), ("gdb", gdb_path)) if not p]
         r = base_result(source, timeout, max_events, max_output, runtime)
@@ -484,6 +498,19 @@ def capture_cpp(source, stdin="", timeout=5.0, max_events=500, max_output=8192):
         detail = final.pop("detail", None)
         exit_code = final.pop("exit_code", None)
         signal_name = final.pop("signal", None)
+        # Which limit ended the run, in the shared recording field (see TRACE_FORMAT.md "limit_hit").
+        status_now = final.get("status")
+        if status_now == "trace_limit" and limit_kind == "events":
+            final["limit_hit"] = {"kind": "events", "limit": max_events}
+        elif status_now == "trace_limit" and limit_kind == "frames":
+            final["limit_hit"] = {"kind": "stack_depth", "limit": 32}
+        elif status_now == "trace_limit" and limit_kind == "file":
+            final["limit_hit"] = {"kind": "recording_size", "limit": FILE_LIMIT_BYTES}
+        elif status_now == "output_limit":
+            final["limit_hit"] = {"kind": "output_chars", "limit": max_output}
+        elif status_now == "timeout":
+            # Two different clocks: one line that never finishes (step budget), or the whole run's time limit.
+            final["limit_hit"] = {"kind": "step_time", "limit": step_budget} if stuck_line else {"kind": "wall_time", "limit": timeout}
         if final.get("status") == "worker_error" and detail:
             diags.append(diag("tracer", "error", "worker-failed", None, "Tracer failure: " + detail))
         checker.join(timeout=timeout + 8)

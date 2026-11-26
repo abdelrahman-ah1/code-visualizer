@@ -81,3 +81,25 @@ No C++, web server, login, AI explanations, graph animation or real interpreter 
 - Unix resource limits: https://docs.python.org/3.12/library/resource.html
 
 Your earlier project plan remains the high-level scope. This pack implements its first gate only.
+
+
+## Measured performance (local, one machine, 1 core; see the notes for what each number is)
+
+Baseline is commit 3bee74b. "p95" is the 95th percentile of the runs listed. Chrome numbers are the JS heap after load over an empty page, forced GC, production build (`vite build` + preview). These are one machine's numbers, not guarantees.
+
+| What | Before | After | Runs |
+| --- | --- | --- | --- |
+| Python, 1,806-event loop: server capture | 67 ms | 60 ms (66 ms with the compact form) | 20, median; p95 62 (plain), 71 (compact) |
+| Python print-heavy: server capture | 33 ms | 25 ms (20 ms compact) | 20, median |
+| Run response, 1,806-event loop | 3.59 MB | 0.57 MB compact (gzip 0.036 → 0.026 MB) | 1 |
+| Run response, print-heavy | 1.99 MB | 0.11 MB | 1 |
+| Chrome heap, 1,806-event loop | 5.33 MB | 3.37 MB | 3, no spread |
+| Chrome heap, print-heavy (453 events) | 2.94 MB | 1.13 MB | 3 |
+| Click to first frame, 1,806-event loop (production build, patched tree only) | not measured on baseline | 252-286 ms: 35-51 ms before the request, first byte 135-169 ms (capture about 60 ms), about 100-113 ms parse and draw after the response | 5 |
+| Far seeks in Chrome | about 34 ms | about 34 ms (60 Hz frame floor) | 8 per run |
+| C++ Huffman (278 events): cold / warm median / warm p95 | 1,716 / 1,681 / 1,790 ms | 1,106 / 1,099 / 1,182 ms | 10 runs, n=9 warm |
+| C++ hashtree (198 events) | 679 / 692 / 714 ms | 659 / 653 / 694 ms | 10 runs |
+| 10,000-event compact file (synthetic: one 40-item list whose length grows), first frame | 2,020 ms (plain, 19.2 MB) | 303 ms (compact, 1.4 MB) | 2 |
+| Same file, Chrome heap | 17.9-18.2 MB | 6.7 MB | 2 |
+
+Things these numbers do not show: the compact form shrinks gzip transfer very little (gzip already removes the repetition), the 10,000-event row is a best case for the delta encoding, Windows, Safari and Edge are untested, and CI (`.github/workflows/ci.yml`) has not been run on GitHub.

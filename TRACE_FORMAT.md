@@ -105,3 +105,32 @@ A heap object may carry `"orphan": true`: the block is still allocated (never fr
 A recording may be stored gzip-compressed. The viewer detects gzip by its first two bytes, not the file name, and `.json` files open exactly as before. The compressed bytes unpack to the same JSON text (the viewer saves the exact validated text, nothing is re-serialised). The 20 MiB limit applies to the unpacked text: unpacking stops as soon as that limit is passed, and a truncated or damaged file is refused with the previous recording kept. Saving and opening use the browser's Compression Streams; where they are missing, `.json` and session export still work and the save button is hidden.
 
 When the recording file itself reaches its size limit (16 MiB), the run ends with status `trace_limit` and a diagnostic saying so; the steps recorded before that point are kept and are a valid beginning of the run (the incomplete last line is dropped). It is no longer reported as `worker_error`.
+
+
+## Which limit ended a run (`limit_hit`, optional)
+
+When a limit stopped the run, the recording may carry `"limit_hit": {"kind": ..., "limit": number}`. Older recordings have no such field and open as before. `kind` is one of:
+
+| `kind` | Meaning | `limit` |
+| --- | --- | --- |
+| `events` | The event limit chosen for the run (status `trace_limit`). | events |
+| `objects` | More than 300 distinct objects to track (`trace_limit`, Python). | 300 |
+| `stack_depth` | Calls nested deeper than 32 (`trace_limit`, Python). | 32 |
+| `output_chars` | The output limit (`output_limit`). | characters |
+| `wall_time` | The time limit (`timeout`). | seconds |
+| `step_time` | C++ only: the program stayed on one line longer than the per-step budget (`timeout`). | seconds |
+| `cpu_time` | The CPU-time backstop, set 2 s above the time limit (`worker_error`, Python; normally the wall limit fires first). | seconds |
+| `memory` | A `MemoryError` under the 256 MiB allowance. The allowance covers the program and the recorder together, so it does not say which needed it (`error`, Python). | bytes |
+| `recording_size` | One recording file reached its 16 MiB size limit (`trace_limit`; Python and C++). The steps before it are kept. | bytes |
+
+C++ sets `events`, `stack_depth`, `output_chars`, `wall_time`, `step_time` and `recording_size`; it has no memory or CPU-time kinds. Nothing is attributed when the cause is not known (for example a worker killed by the operating system for another reason).
+
+## Compact encodings (`encoding`, optional)
+
+Recordings may be stored with `"encoding": "node-pool/1"`, `"node-pool/2"` or `"node-pool/3"`. The viewer expands them back to the plain 1.0 shape when it opens them, so everything downstream is unchanged. Plain 1.0 files have no `encoding` field and still open exactly as before.
+
+- `node-pool/1`: `node_pool` holds each distinct heap node once; each event's `heap` is `{objectId: poolIndex}`.
+- `node-pool/2`: also `frame_pool` (each distinct frame list once; an event's `frames` is an index), and `stdout_text` / `stderr_text` hold the final output once; an event's `stdout` / `stderr` is then a length into that text, counted in UTF-16 units.
+- `node-pool/3`: a pool entry may be `{"delta_of": earlierIndex, "set": {field: value}, "append": [items]}`: the earlier entry with those top-level fields replaced and items added at the end. `items` is never replaced, only appended to.
+
+The viewer bounds what a compact file may expand to by the same 20 MiB limit as a plain file (each rebuilt entry counts its full JSON size), and refuses bad indexes, forward or unknown delta bases, unknown delta fields and more than 10,000 events. The Run button asks the backend for the compact form (Python only); "Save recording" always writes the plain 1.0 shape, "Save compact" and the offline export write `node-pool/2`.

@@ -23,6 +23,17 @@ import gdb  # only importable inside gdb
 D = os.environ["CODEVIZ_DIR"]
 REQ = json.load(open(os.path.join(D, "request.json"), encoding="utf-8"))
 SRC = os.path.realpath(REQ["source_path"])
+_IN_SOURCE = {}
+
+
+def _in_source(symtab):
+    """Is this symbol table the user's file? Cached by file name: realpath was 65% of the tracing time (it ran for every
+    global and function symbol at every event, about 54,000 calls on a 278-event run)."""
+    name = symtab.fullname()
+    hit = _IN_SOURCE.get(name)
+    if hit is None:
+        hit = _IN_SOURCE[name] = os.path.realpath(name) == SRC
+    return hit
 MAX_EVENTS = REQ["max_events"]
 MAX_OUT = REQ["max_output"]
 MAX_FRAMES, MAX_NODES, MAX_DEPTH, MAX_ITEMS, MAX_LOCALS = 32, 300, 300, 40, 40
@@ -659,7 +670,7 @@ def closing_line(frame):
 
 def is_user(frame):
     sal = frame.find_sal()
-    return sal.symtab is not None and os.path.realpath(sal.symtab.fullname()) == SRC
+    return sal.symtab is not None and _in_source(sal.symtab)
 
 
 def user_frames():
@@ -735,9 +746,9 @@ def global_bindings(frame):
         blk0 = frame.block()
         for blk in (blk0.static_block, blk0.global_block):
             for sym in blk:
-                if sym.is_variable and sym.symtab is not None and os.path.realpath(sym.symtab.fullname()) == SRC:
+                if sym.is_variable and sym.symtab is not None and _in_source(sym.symtab):
                     out.append((sym.print_name, sym.value()))
-                elif sym.is_function and sym.symtab is not None and os.path.realpath(sym.symtab.fullname()) == SRC:
+                elif sym.is_function and sym.symtab is not None and _in_source(sym.symtab):
                     # `static` variables inside functions live for the whole run, so they are roots even while the function is not running
                     try:
                         for inner in _function_block(sym):

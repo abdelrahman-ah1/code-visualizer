@@ -7,11 +7,52 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
+import select
 
 SCHEMA = "codeviz.trace/1.0"
 
 
-def capture(source, stdin="", timeout=2.0, max_events=500, max_output=8192):
+def _wait(proc, timeout):
+    """True when the process ended within `timeout` seconds. No timer thread, nothing to cancel.
+
+    Popen.wait(timeout=...) polls with sleeps that grow to 50 ms, so a fast run was noticed up to 50 ms late. On Linux a
+    pidfd is readable exactly when the process ends, which gives an exact wait. The process is not reaped here, so its
+    process-group id cannot be reused before _kill_group runs. Elsewhere: a short fixed poll (at most 2 ms).
+    """
+    if hasattr(os, "pidfd_open"):
+        try:
+            fd = os.pidfd_open(proc.pid)
+        except OSError:
+            fd = None
+        if fd is not None:
+            try:
+                ready, _, _ = select.select([fd], [], [], timeout)
+            finally:
+                os.close(fd)
+            return bool(ready)
+    deadline = time.monotonic() + timeout
+    while proc.poll() is None:
+        left = deadline - time.monotonic()
+        if left <= 0:
+            return False
+        time.sleep(min(0.002, left))
+    return True
+
+
+def _kill_group(proc):
+    if os.name == "posix":
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)   # the worker runs in its own session (start_new_session), so this is its group only
+        except ProcessLookupError:
+            pass
+    elif proc.poll() is None:
+        proc.kill()   # Windows: no process groups here; only the worker itself is ended
+
+
+def capture(source, stdin="", timeout=2.0, max_events=500, max_output=8192, as_json=False, pooled=False):
+    """as_json=True returns the same trace as a JSON string, splicing the worker's event lines
+    without parsing and re-encoding them (the server only forwards it)."""
     if len(source.encode("utf-8")) > 65536:
         raise ValueError("Source exceeds 64 KiB")
     if len(stdin.encode("utf-8")) > 8192:
@@ -25,6 +66,7 @@ def capture(source, stdin="", timeout=2.0, max_events=500, max_output=8192):
         (root / "request.json").write_text(json.dumps({
             "source": source, "stdin": stdin, "max_events": max_events,
             "max_output": max_output,
+            "cpu_seconds": int(timeout) + 2, "pooled": bool(pooled and as_json),
         }), encoding="utf-8")
         # A fresh interpreter, temp cwd, no inherited PYTHONPATH or secret env vars.
         # This is process separation, NOT a security boundary.
@@ -35,34 +77,70 @@ def capture(source, stdin="", timeout=2.0, max_events=500, max_output=8192):
                 env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
                 start_new_session=(os.name == "posix"),
             )
+            timed_out = not _wait(proc, timeout)
             try:
-                proc.wait(timeout=timeout)
-            except subprocess.TimeoutExpired:
-                timed_out = True
+                _kill_group(proc)   # also ends anything the program left running
             finally:
-                if os.name == "posix":
-                    try:
-                        os.killpg(proc.pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
-                elif proc.poll() is None:
-                    proc.kill()
                 proc.wait()
         events = []
+        raw_lines = []
         stream = root / "events.jsonl"
         if stream.exists():
-            for line in stream.read_text(encoding="utf-8").splitlines():
-                try:
-                    events.append(json.loads(line))
-                except json.JSONDecodeError:
-                    break  # A kill can interrupt the final write.
+            text = stream.read_text(encoding="utf-8")
+            if as_json:
+                # Every complete record ends with a newline; a kill can cut the last one short.
+                raw_lines = text[:text.rfind("\n") + 1].splitlines() if text else []
+            else:
+                for line in text.splitlines():
+                    try:
+                        events.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        break  # A kill can interrupt the final write.
         final = root / "final.json"
         result = json.loads(final.read_text(encoding="utf-8")) if final.exists() else {}
         if timed_out:
-            result = {"status": "timeout", "complete": False}
+            result = {"status": "timeout", "complete": False, "limit_hit": {"kind": "wall_time", "limit": timeout}}
         elif not result:
             result = {"status": "worker_error", "complete": False,
                       "worker_exit_code": proc.returncode}
+            # A signal ends the worker with a negative code. The two resource limits we set announce themselves this way.
+            if proc.returncode == -getattr(signal, "SIGXCPU", 0):
+                result["limit_hit"] = {"kind": "cpu_time", "limit": int(timeout) + 2}
+            elif proc.returncode == -getattr(signal, "SIGXFSZ", 0):
+                result["limit_hit"] = {"kind": "recording_size", "limit": 16 * 1024 * 1024}
+        if as_json and pooled:
+            def whole_lines(name):
+                p = root / (name + ".txt")
+                t = p.read_text(encoding="utf-8") if p.exists() else ""
+                return t[:t.rfind("\n") + 1].split("\n")[:-1]
+            def raw_text(name):
+                p = root / (name + ".txt")
+                if not p.exists():
+                    return ""
+                with p.open(encoding="utf-8", errors="surrogatepass", newline="") as fh:
+                    return fh.read()
+            enc = lambda v: json.dumps(v, ensure_ascii=True, allow_nan=False, separators=(",", ":"))
+            head = {"schema_version": SCHEMA,
+                    "runtime": {"implementation": sys.implementation.name,
+                                "version": sys.version.split()[0]},
+                    "source": source,
+                    "limits": {"wall_seconds": timeout, "events": max_events,
+                               "output_chars": max_output}}
+            tail = enc(result)
+            return (enc(head)[:-1] + ',"encoding":"' + ("node-pool/3" if (root / "deltas.flag").exists() else "node-pool/2") + '","node_pool":[' + ",".join(whole_lines("nodes"))
+                    + '],"frame_pool":[' + ",".join(whole_lines("frames"))
+                    + '],"stdout_text":' + enc(raw_text("stdout")) + ',"stderr_text":' + enc(raw_text("stderr"))
+                    + ',"events":[' + ",".join(raw_lines) + "]," + tail[1:])
+        if as_json:
+            head = {"schema_version": SCHEMA,
+                    "runtime": {"implementation": sys.implementation.name,
+                                "version": sys.version.split()[0]},
+                    "source": source,
+                    "limits": {"wall_seconds": timeout, "events": max_events,
+                               "output_chars": max_output}}
+            tail = json.dumps(result, ensure_ascii=True, allow_nan=False, separators=(",", ":"))
+            return (json.dumps(head, ensure_ascii=True, allow_nan=False, separators=(",", ":"))[:-1]
+                    + ',"events":[' + ",".join(raw_lines) + "]," + tail[1:])
         return {"schema_version": SCHEMA,
                 "runtime": {"implementation": sys.implementation.name,
                             "version": sys.version.split()[0]},
