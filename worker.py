@@ -137,9 +137,15 @@ class Encoder:
                     break
                 bindings[name] = encode(value)
             stack.append({"depth": index, "function": frame.f_code.co_name,
-                          "line": frame.f_lineno, "locals": bindings})
+                          "line": _lineno(frame), "locals": bindings})
         detail = encode(extra) if extra is not None else None
         return stack, heap, detail, sorted(set(truncated))
+
+
+def _lineno(frame):
+    """The line an event points at. Python 3.12+ reports 0 for a just-created module frame's 'call' event
+    (earlier versions reported the first line); fall back to the code's first line so events always point into the source."""
+    return frame.f_lineno or frame.f_code.co_firstlineno
 
 
 def _delta(old, new):
@@ -245,11 +251,11 @@ def run(root):
                     if fi is None:
                         fi = frame_ids[ftext] = len(frame_ids)
                         side["frames"].write(ftext + "\n")
-                    record = {"step": count, "event": event, "line": frame.f_lineno,
+                    record = {"step": count, "event": event, "line": _lineno(frame),
                               "frames": fi, "heap": links, "stdout": u16("stdout", stdout.getvalue()),
                               "stderr": u16("stderr", stderr.getvalue()), "truncated": truncated}
                 else:
-                    record = {"step": count, "event": event, "line": frame.f_lineno,
+                    record = {"step": count, "event": event, "line": _lineno(frame),
                               "frames": stack, "heap": heap, "stdout": stdout.getvalue(),
                               "stderr": stderr.getvalue(), "truncated": truncated}
                 if event == "return":
