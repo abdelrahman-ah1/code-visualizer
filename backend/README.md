@@ -29,6 +29,7 @@ Limits: source up to 64 KiB, stdin up to 8 KiB, `timeout` 0.05 to 10 seconds (de
 
 | Status | `error.code` | When |
 |---|---|---|
+| 401 | `bad_token` | Missing or wrong session token (see below) |
 | 403 | `bad_host`, `bad_origin` | Host is not localhost / 127.0.0.1 / ::1, or the Origin is not an allowed page |
 | 413 | `too_large` | body over 300 kB, or source/stdin over their byte limits |
 | 415 | `bad_content_type` | POST that is not `application/json` |
@@ -36,6 +37,8 @@ Limits: source up to 64 KiB, stdin up to 8 KiB, `timeout` 0.05 to 10 seconds (de
 | 429 | `busy` | more than `CODEVIZ_MAX_RUNS` (default 2) runs at once |
 
 Allowed Origins are the Vite dev and preview servers on `127.0.0.1` and `localhost` (ports 5173, 4173). Add more with `CODEVIZ_ORIGINS=http://127.0.0.1:3000,...`.
+
+**Session token.** At startup the server makes a random token and writes it to `.codeviz-token` in the repository root (readable only by your user; `CODEVIZ_TOKEN_FILE` changes the path). The backend holds an exclusive lock on that file while it runs (the system releases it if the backend crashes), so only one backend can use a token file: a second one stops at startup with a message telling you to give it its own `CODEVIZ_TOKEN_FILE` (and to start its Vite server with the same variable). The file stays after exit and the next backend replaces its token. A request without the token gets 401, so a web page that reaches port 8000 directly, or another local app on an allowed port, cannot run code. It does not stop programs already running as your user, which can read the file.
 
 Every trace response carries `Server-Timing: capture;dur=..., encode;dur=...`, and is gzip-compressed when the browser accepts it.
 
