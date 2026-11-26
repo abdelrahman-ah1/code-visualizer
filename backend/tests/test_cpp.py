@@ -234,6 +234,21 @@ class Supported(unittest.TestCase):
         self.assertEqual([i["value"] for i in st["items"]], [1, 2, 3])
         self.assertEqual(sum(1 for n in ev["heap"].values() if n["storage"] == "heap"), 3)
 
+    def test_vector_bool_elements_are_drawn_as_bools(self):
+        # vector<bool>'s bits have no addressable gdb.Value, so the printer hands plain Python bools
+        # to the encoder. Before-line semantics: at line 9 flags[1] is set but flags[3] is not.
+        r = run("vector_bool")
+        self.assertEqual((r["status"], r["complete"]), ("ok", True))
+
+        def bits(line):
+            ev = next(e for e in r["events"] if e["line"] == line and e["event"] == "line")
+            node = next(n for n in ev["heap"].values()
+                        if n.get("type") == "std::vector" and n.get("element_type") == "bool")
+            return [i["value"] for i in node["items"]]
+
+        self.assertEqual(bits(9), [False, True, False, False])
+        self.assertEqual(bits(10), [False, True, False, True])
+
     def test_nodes_held_by_globals_and_statics_are_never_flagged_unreachable(self):
         # reachable from: a global, a file-level static, a function-local static (function not running); one node is really lost
         r = run("globals_statics")
