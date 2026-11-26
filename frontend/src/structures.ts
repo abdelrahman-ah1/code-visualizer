@@ -459,7 +459,7 @@ export function fmt(v: Value, max = 9): string {
   switch (v.kind) {
     case 'scalar': return v.value === null ? 'None' : typeof v.value === 'boolean' ? (v.value ? 'True' : 'False') : typeof v.value === 'string' ? clip(JSON.stringify(v.value)) : clip(String(v.value));
     case 'ref': return `→ ${v.id}`;
-    case 'opaque': return clip(v.type);
+    case 'opaque': return v.type.startsWith('uninitialised ') ? 'uninit' : clip(v.type);
     case 'truncated': return '…';
   }
 }
