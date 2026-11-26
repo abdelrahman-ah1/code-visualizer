@@ -175,7 +175,8 @@ def child_pids(pid):
         for name in os.listdir("/proc"):
             if name.isdigit():
                 try:
-                    stat = open(f"/proc/{name}/stat").read()
+                    with open(f"/proc/{name}/stat") as fh:
+                        stat = fh.read()
                     if int(stat.rsplit(")", 1)[1].split()[1]) == pid:
                         out.append(int(name))
                 except (OSError, ValueError, IndexError):
