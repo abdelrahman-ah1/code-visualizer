@@ -47,7 +47,7 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
     const fmtData = (v: Value) => (v.kind === 'scalar' && v.value === null ? nullWord : fmt(v, 8));
     const mainText = sp.main ? fmt(sp.main[1], 8) : '', mainY = sp.rest.length + (sp.moreData ? 1 : 0) === 0 ? g.mainH / 2 + 5 : 22;
     const drawn = (v: Value) => v.kind === 'ref' && !!scene.boxes[v.id];
-    const arrows = linksFrom(id).map((l) => { const d = linkPath(l, scene.boxes); return d && <path key={`${l.cell ?? 'n'}>${l.to}${l.port ? 'p' : ''}`} className="arrow" d={d} markerEnd="url(#cv-arrowhead)"/>; });
+    const arrows = linksFrom(id).map((l) => { const d = linkPath(l, scene.boxes); return d && <path key={`${l.cell ?? 'n'}>${l.to}${l.port ? 'p' : ''}`} className="arrow" data-from={l.from} data-to={l.to} d={d} markerEnd="url(#cv-arrowhead)"/>; });
     return <g key={id} className="vnode" data-testid={`box-${id}`} data-x={b.x} data-y={b.y} style={{ transform: `translate(${b.x}px, ${b.y}px)` }}>
       <title>{`${node.type} ${id}${node.address ? ` at ${node.address}` : ''}: ${Object.entries(node.fields ?? {}).map(([k, v]) => `${k}=${v.kind === 'ref' ? v.id : fmt(v, 20)}`).join(', ')}`}</title>
       {tag && <Tag names={tag}/>}
@@ -85,7 +85,7 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
         {cut > 0 && <text className="node-rest" x={b.w / 2} y={mainY + 15 + (d.rest.length + (d.more > 0 ? 1 : 0)) * REC.line} textAnchor="middle" data-testid="edges-cut"><title>{`${cut} neighbour-list item${cut === 1 ? '' : 's'} not captured by the recording`}</title>{`${cut} edge${cut === 1 ? '' : 's'} not captured`}</text>}
       </g>
       <text className="node-id" x="9" y="12">{id}</text>
-      {linksFrom(id).map((l) => { const p = linkPath(l, scene.boxes); return p && <g key={`g>${l.to}`} data-testid={`edge-${l.from}-${l.to}`}><path className="arrow" d={p} markerEnd="url(#cv-arrowhead)" markerStart={l.both ? 'url(#cv-arrowhead)' : undefined}/>{l.label && l.mid && <text className="edge-label" x={l.mid.x} y={l.mid.y - 4} textAnchor="middle">{l.label}</text>}</g>; })}
+      {linksFrom(id).map((l) => { const p = linkPath(l, scene.boxes); return p && <g key={`g>${l.to}`} data-testid={`edge-${l.from}-${l.to}`}><path className="arrow" data-from={l.from} data-to={l.to} d={p} markerEnd="url(#cv-arrowhead)" markerStart={l.both ? 'url(#cv-arrowhead)' : undefined}/>{l.label && l.mid && <text className="edge-label" x={l.mid.x} y={l.mid.y - 4} textAnchor="middle">{l.label}</text>}</g>; })}
     </g>;
   };
   return <section className="panel structures" aria-label="Structures">
@@ -119,12 +119,12 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
                   <text className={`card-value${r.note ? ' note' : ''}`} x={b.w - (isRef ? 22 : 10)} y={portY(i) + 4} textAnchor="end">{isRef && !ok ? `${(r.value as { id: string }).id} missing` : isRef ? (r.value as { id: string }).id : cardText(r.value, nullWord, r.note)}</text>
                   {ok && <circle className="node-dot" cx={b.w - 10} cy={portY(i)} r="3.5"/>}</g>; })}
             </g>
-            {linksFrom(id).map((l) => { const d = linkPath(l, scene.boxes); return d && <path key={`${l.cell}>${l.to}`} className="arrow" d={d} markerEnd="url(#cv-arrowhead)"/>; })}
+            {linksFrom(id).map((l) => { const d = linkPath(l, scene.boxes); return d && <path key={`${l.cell}>${l.to}`} className="arrow" data-from={l.from} data-to={l.to} d={d} markerEnd="url(#cv-arrowhead)"/>; })}
           </g>;
         })}
         {scene.lanes.map((lane) => lane.ids.map((id) => {
           const box = scene.boxes[id], node = event.heap[id], tag = scene.tags[id], m = mark(id);
-          const arrows = linksFrom(id).map((l) => { const d = linkPath(l, scene.boxes); return d && <path key={`${l.cell ?? 'n'}>${l.to}${l.port ? 'p' : ''}`} className="arrow" d={d} markerEnd="url(#cv-arrowhead)"/>; });
+          const arrows = linksFrom(id).map((l) => { const d = linkPath(l, scene.boxes); return d && <path key={`${l.cell ?? 'n'}>${l.to}${l.port ? 'p' : ''}`} className="arrow" data-from={l.from} data-to={l.to} d={d} markerEnd="url(#cv-arrowhead)"/>; });
           if (lane.kind === 'array') {
             const items = node.items ?? [], omitted = arrayOmitted(node);
             return <g key={id} className="vnode" data-testid={`box-${id}`} data-x={box.x} data-y={box.y} style={{ transform: `translate(${box.x}px, ${box.y}px)` }}>

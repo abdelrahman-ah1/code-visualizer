@@ -9,7 +9,7 @@ export type Language = 'python' | 'cpp';
 export const LANGUAGE_NAMES: Record<Language, string> = { python: 'Python', cpp: 'C++' };
 export interface ExampleProgram { id: string; title: string; source: string; stdin: string; language?: Language }
 export interface RunInfo { bytes: number; serverMs: number | null; roundTripMs: number }
-type Cpp = { available: boolean; gpp: boolean; gdb: boolean } | null;
+type Cpp = { available: boolean; gpp: boolean; gdb: boolean; unsupported_platform?: boolean } | null;
 type Backend = { state: 'checking' } | { state: 'online'; python: string; cpp: Cpp } | { state: 'offline' };
 const EVENT_CHOICES = [500, 1000, 2000], TIMEOUT_CHOICES = [2, 5, 10]; // C++ needs about 0.5 s of compile and start-up time on top of the program itself
 
@@ -51,7 +51,7 @@ export function RunPanel({ source, stdin, language, onSource, onStdin, onLanguag
     controller.current = abort; setRunning(true); setMessage(''); setInfo(null);
     const started = performance.now();
     try {
-      const response = await fetch('/api/trace', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: abort.signal, body: JSON.stringify({ source, stdin, language, timeout, max_events: events }) });
+      const response = await fetch('/api/trace', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: abort.signal, body: JSON.stringify({ source, stdin, language, timeout, max_events: events, ...(language === 'python' ? { pooled: true } : {}) }) });
       const text = await response.text();
       if (id !== runId.current) return;
       if (!response.ok) {
@@ -86,7 +86,8 @@ export function RunPanel({ source, stdin, language, onSource, onStdin, onLanguag
       <span className="hint">{running ? 'Tracing...' : 'Ctrl+Enter also runs. In the editor, Tab indents; press Esc then Tab to leave it.'}</span>
       <span className={`hint ${tooBig ? 'warning' : ''}`}>{size.toLocaleString()} / {MAX_SOURCE_BYTES.toLocaleString()} bytes</span></div>
     {!collapsed && language === 'cpp' && <p className="run-twice warning" data-testid="run-twice-warning"><b>C++ runs your program twice:</b> once for the step-by-step recording and once for the memory check. Each run gets its own empty working folder, so relative file names do not collide. Files written with absolute paths, and network calls, can still happen twice.</p>}
-    {cppMissing && backend.state === 'online' && <div className="offline-help" data-testid="cpp-missing"><b>C++ tools not found.</b> This backend needs {[!backend.cpp?.gpp && 'g++', !backend.cpp?.gdb && 'gdb'].filter(Boolean).join(' and ')} on its PATH. On Ubuntu or WSL: <code>sudo apt install g++ gdb</code>, then press Check again.<br/><button type="button" onClick={() => void check()}>Check again</button></div>}
+    {cppMissing && backend.state === 'online' && backend.cpp?.unsupported_platform && <div className="offline-help" data-testid="cpp-unsupported"><b>C++ mode is not available on native Windows.</b> It needs gdb under Linux. Use WSL2 (see WSL_SETUP.md) to record C++. Python mode works here.</div>}
+    {cppMissing && backend.state === 'online' && !backend.cpp?.unsupported_platform && <div className="offline-help" data-testid="cpp-missing"><b>C++ tools not found.</b> This backend needs {[!backend.cpp?.gpp && 'g++', !backend.cpp?.gdb && 'gdb'].filter(Boolean).join(' and ')} on its PATH. On Ubuntu or WSL: <code>sudo apt install g++ gdb</code>, then press Check again.<br/><button type="button" onClick={() => void check()}>Check again</button></div>}
     {message && <div className="error" role="alert" data-testid="run-error"><b>Run failed</b><p>{message}</p></div>}
     {info && !message && <p className="hint" data-testid="run-info">Recorded {(info.bytes / 1e6).toFixed(2)} MB in {Math.round(info.roundTripMs)} ms{info.serverMs !== null ? `, of which ${Math.round(info.serverMs)} ms on the backend` : ''}.</p>}
     {backend.state === 'offline' && <div className="offline-help" data-testid="offline-help"><b>Backend not running.</b> Opening saved recordings below still works. To run code, open a second terminal in the repository folder:<pre>{`pip install -r backend/requirements.txt\npython -m uvicorn backend.app:app --host 127.0.0.1 --port 8000`}</pre><button type="button" onClick={() => void check()}>Check again</button></div>}

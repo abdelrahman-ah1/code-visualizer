@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Trace } from '../types';
 import { usePlayback } from '../usePlayback';
-import { eventMeaning, outputAt, statusMeaning } from '../replay';
+import { eventMeaning, limitText, outputAt, statusMeaning } from '../replay';
 import { Controls } from './Controls';
 import { Source } from './Source';
 import { CallStack, Heap } from './Memory';
@@ -30,7 +30,7 @@ export function Replay({ trace, breakpoints, onToggleBreakpoint, watches, onAddW
   // Findings opens by itself when the recording has problems; otherwise Heap is open by default.
   const shown: TabId | 'closed' = tab ?? (trace.diagnostics?.length ? 'findings' : 'heap');
   const atEnd = !trace.events.length || p.index === trace.events.length - 1;
-  return <><div className="replay-root"><div className={`run-status ${trace.status === 'ok' && !found ? '' : 'warning'}`}>{found > 0 && <b className="overall" data-testid="overall">Problems found: {found} {found === 1 ? 'error' : 'errors'}. See Findings below.</b>}<b>Recorded run: {trace.status}</b><span>{statusMeaning[trace.status]}. {trace.complete ? 'Final record captured.' : 'Incomplete capture.'}{found > 0 && trace.status === 'ok' ? ' This only says the recording finished. It does not mean the program is correct.' : ''}</span><small>{trace.runtime.implementation} {trace.runtime.version}{trace.error ? ` · ${trace.error.type}${trace.error.line ? ` on line ${trace.error.line}` : ''}` : ''}</small></div>
+  return <><div className="replay-root"><div className={`run-status ${trace.status === 'ok' && !found ? '' : 'warning'}`}>{found > 0 && <b className="overall" data-testid="overall">Problems found: {found} {found === 1 ? 'error' : 'errors'}. See Findings below.</b>}<b>Recorded run: {trace.status}</b><span>{limitText(trace.limit_hit) ? `Capture ended early. ${limitText(trace.limit_hit)} ` : `${statusMeaning[trace.status]}. `}{trace.complete ? 'Final record captured.' : 'Incomplete capture.'}{found > 0 && trace.status === 'ok' ? ' This only says the recording finished. It does not mean the program is correct.' : ''}</span><small>{trace.runtime.implementation} {trace.runtime.version}{trace.error ? ` · ${trace.error.type}${trace.error.line ? ` on line ${trace.error.line}` : ''}` : ''}</small></div>
     <div className="sticky-bar">
       <Controls playback={p} count={trace.events.length} stops={stops}/>
       <p className="hint breakpoint-note" data-testid="breakpoint-note">{breakpoints.size ? `Breakpoints: line ${[...breakpoints].sort((a, b) => a - b).join(', ')}. Play stops before each one runs.${unreached.length ? ` Never reached in this recording: ${unreached.join(', ')}.` : ''}` : 'Click a line number in the source to set a breakpoint. Breakpoints stop at recorded steps, they do not re-run the program.'}</p>
