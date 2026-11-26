@@ -19,7 +19,7 @@ async function views(page: Page) {
   }
   return out;
 }
-test('compact save writes node-pool/1, reopens to the same replay, and the plain save is unchanged', async ({ page }) => {
+test('compact save writes node-pool/2, reopens to the same replay, and the plain save is unchanged', async ({ page }) => {
   await page.goto('/');
   await upload(page, `${EX}.json`, 'application/json', exFile());
   const original = await views(page);
@@ -28,7 +28,7 @@ test('compact save writes node-pool/1, reopens to the same replay, and the plain
   expect(dl.suggestedFilename()).toBe(`${EX}.pooled.json.gz`);
   await dl.saveAs(`${OUT}/compact.json.gz`);
   const packed = gunzipSync(readFileSync(`${OUT}/compact.json.gz`)).toString('utf8');
-  expect(JSON.parse(packed).encoding).toBe('node-pool/1');
+  expect(JSON.parse(packed).encoding).toBe('node-pool/2');
   expect(packed.length).toBeLessThan(exFile().length);
   await expect(page.getByTestId('export-notice')).toContainText('node-pool format');
   // the original "Save recording" button still writes exactly the text that was loaded
@@ -60,7 +60,7 @@ test('session export embeds the pooled form, opens offline from disk and replays
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export session (.html)' }).click()]);
   await dl.saveAs(`${OUT}/session.html`);
   const html = readFileSync(`${OUT}/session.html`, 'utf8');
-  expect(html).toContain('node-pool/1');
+  expect(html).toMatch(/"encoding":"node-pool\/2"/);   // the embedded data itself, not just the reader text in the template
   expect(html).not.toMatch(/(src|href)="https?:/);
   const ctx = await browser.newContext({ offline: true }); const p = await ctx.newPage();
   const errors: string[] = []; p.on('pageerror', (e) => errors.push(String(e)));

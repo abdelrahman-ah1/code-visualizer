@@ -14,7 +14,7 @@ test('a capped recording is never shown as a finished run, and it saves/reopens 
   await page.getByRole('button', { name: 'Run and record' }).click();
   await expect(page.getByText(/Event 1 of \d+/)).toBeVisible({ timeout: 40000 });
   await expect(page.locator('.run-status b').first()).toHaveText('Recorded run: trace_limit');
-  await expect(page.locator('.run-status')).toContainText('may have continued');
+  await expect(page.locator('.run-status')).toContainText('Capture ended early');
   await expect(page.locator('.run-status')).not.toContainText('Run finished normally');
   await page.getByRole('button', { name: 'Last', exact: true }).click();
   await expect(page.locator('.run-status')).toContainText('trace_limit');

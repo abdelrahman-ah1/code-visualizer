@@ -99,9 +99,9 @@ describe('node-pool/1 shared records stay unmodified by the viewer logic', () =>
     buildLineIndex(pooled.events);
     expect(JSON.stringify(pooled)).toBe(before);
   });
-  it('documents the alias risk: mutating a shared node after parse changes every event that shares it', () => {
+  it('alias risk is guarded: in development and tests a parsed recording is frozen, so editing a shared node throws instead of silently changing other events', () => {
     const got = parseTrace(JSON.stringify(base())); const a = got.events[100].heap, b = got.events[101].heap;
-    const shared = Object.keys(a).find((id) => a[id] === b[id])!; (a[shared] as any).type = 'CHANGED';
-    expect(b[shared].type).toBe('CHANGED');
+    const shared = Object.keys(a).find((id) => a[id] === b[id])!; expect(() => { (a[shared] as any).type = 'CHANGED'; }).toThrow(TypeError);
+    expect(b[shared].type).not.toBe('CHANGED');
   });
 });

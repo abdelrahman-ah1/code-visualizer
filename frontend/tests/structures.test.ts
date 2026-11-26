@@ -76,7 +76,7 @@ describe('arrays', () => {
   });
   it('marks omitted elements instead of hiding them', () => {
     const t = load('14_array_mutation');
-    const e = structuredClone(t.events[t.events.length - 1]);
+    const e = JSON.parse(JSON.stringify(t.events[t.events.length - 1]));
     const id = Object.keys(e.heap).find((k) => e.heap[k].type === 'list')!;
     e.heap[id].length = 100; e.heap[id].truncated = true;
     const t2 = { ...t, events: [e] };

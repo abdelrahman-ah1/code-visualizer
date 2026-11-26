@@ -168,7 +168,8 @@ describe('graph drawn the same way from the first event (arrows never end in emp
 
 describe('trace-wide graph types stay truthful', () => {
   const lastIdx = (t: Trace) => t.events.length - 1;
-  const clone = (t: Trace): Trace => structuredClone(t);
+  // parseTrace now shares unchanged parts between events (memory), and structuredClone keeps that sharing, so a test that edits one event needs a real deep copy.
+  const clone = (t: Trace): Trace => JSON.parse(JSON.stringify(t));
   const view = (s: ReturnType<typeof buildScene>) => Object.entries(s.boxes).map(([id, b]) => `${id}:${b.kind}:${b.vertex ? 'v' : '-'}`).sort().join(',');
   it('eager buildScenes and lazy sceneCache (any seek order) draw every event the same', () => {
     const t = load('graph'), eager = buildScenes(t).map(view), cache = sceneCache(t);

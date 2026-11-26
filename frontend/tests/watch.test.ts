@@ -71,11 +71,11 @@ describe('change detection', () => {
     expect(changeIndexes(watchSignatures(list, path('items[0]')))).toEqual([2, 4]);
   });
   it('a name rebound to an equal-looking but different object counts as a change', () => {
-    const t = structuredClone(load('05_alias')); const e = t.events[t.events.length - 1];
+    const t = JSON.parse(JSON.stringify(load('05_alias'))); const e = t.events[t.events.length - 1];
     // Same contents, new ID: a copy, not the same list.
     const before = watchSignatures(t, path('a'));
-    const copy = structuredClone(e); const id = (copy.frames[0].locals.a as { id: string }).id;
-    copy.heap['o99'] = structuredClone(copy.heap[id]); copy.frames[0].locals.a = { kind: 'ref', id: 'o99' };
+    const copy = JSON.parse(JSON.stringify(e)); const id = (copy.frames[0].locals.a as { id: string }).id;
+    copy.heap['o99'] = JSON.parse(JSON.stringify(copy.heap[id])); copy.frames[0].locals.a = { kind: 'ref', id: 'o99' };
     t.events = [e, copy];
     const sigs = watchSignatures(t, path('a'));
     expect(sigs[0]).not.toBe(sigs[1]); expect(changeIndexes(sigs)).toEqual([1]); expect(before.length).toBeGreaterThan(0);

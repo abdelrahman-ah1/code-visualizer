@@ -31,6 +31,12 @@ test('Huffman example: default C++ limit completes; 2 s override gives neutral i
   expect(sent[0]).toBe(5);
   if (await b.isVisible()) await b.click();
   await limit(page).selectOption('2');
+  // The UI must send the 2 s the user picked (asserted below). The request that reaches the backend is
+  // shortened to 0.3 s so the recording is cut off on any machine, however fast gdb is.
+  await page.route('**/api/trace', (route) => {
+    const body = JSON.parse(route.request().postData() || '{}');
+    route.continue({ postData: JSON.stringify({ ...body, timeout: 0.3 }) });
+  });
   await page.getByRole('button', { name: 'Run and record' }).click();
   await expect(page.locator('.run-status')).toContainText('timeout', { timeout: 30000 });
   expect(sent[1]).toBe(2);
