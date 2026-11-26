@@ -304,6 +304,22 @@ class Encoder:
             if rec is not None and not rec["freed"]:
                 self.owned.add(rec["start"])
 
+    def vector_uninitialised(self, val, items):
+        """True when a std::vector's words cannot be a constructed vector: begin <= end <= capacity-end must hold and the
+        used size must be a whole number of elements. When the layout cannot be read, fall back to the evidence of the
+        cells themselves: every one of them unreadable."""
+        try:
+            if gdb.selected_frame().architecture().name() == "i386:x86-64" and val.type.strip_typedefs().sizeof == 24:
+                data = bytes(gdb.selected_inferior().read_memory(int(val.address), 24))
+                b, e, c = (int.from_bytes(data[i:i + 8], "little") for i in (0, 8, 16))
+                size = val.type.strip_typedefs().template_argument(0).sizeof
+                if not (b <= e <= c) or (size and (e - b) % size):
+                    return True
+                return False
+        except (gdb.error, TypeError, ValueError, OverflowError, RuntimeError):
+            pass
+        return bool(items) and all(i.get("kind") == "opaque" for i in items)
+
     def buffer_released(self, val, base):
         """True when the library object's OWN backing buffer was freed (the object was destroyed or its storage released).
 
@@ -590,6 +606,13 @@ class Encoder:
                 node["type"], node["element_type"] = "std::vector", tname[len("std::vector<"):-1]
                 node["items"] = [self.value(c, depth) for c in children]
                 node["length"] = len(children) if not node.get("truncated") else len(children) + 1
+                if self.vector_uninitialised(val, node["items"]):
+                    # Not constructed yet (the stop is on its declaration line): its three pointers are stale stack bytes,
+                    # and drawing the cells they happen to point at would invent contents. An empty vector is the honest picture.
+                    node["items"], node["length"] = [], 0
+                    node.pop("truncated", None)
+                    if "items" in self.truncated:
+                        self.truncated.remove("items")
                 return
             if info["count"]:                              # new T[n] / malloc(n * sizeof(T))
                 node["type"], node["element_type"] = "array", tname
