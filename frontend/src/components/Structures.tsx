@@ -142,7 +142,11 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
           const box = scene.boxes[id], node = event.heap[id], tag = scene.tags[id], m = mark(id);
           const arrows = linksFrom(id).map((l) => { const d = linkPath(l, scene.boxes); return d && <path key={`${l.cell ?? 'n'}>${l.to}${l.port ? 'p' : ''}`} className="arrow" data-from={l.from} data-to={l.to} d={d} markerEnd="url(#cv-arrowhead)"/>; });
           if (lane.kind === 'array') {
-            const items = node.items ?? [], omitted = arrayOmitted(node);
+            const items = node.items ?? [], omitted = arrayOmitted(node), cells = Math.max(1, items.length + (omitted > 0 ? 1 : 0));
+            // A stack is a vertical column, cell 0 at the bottom, top marked; a queue is horizontal with front/back marks.
+            // When the recording cut items off, the missing end is the one not marked: the true top/back was not captured.
+            const cx = (i: number) => (box.stack ? 0 : i * GEOM.cell);
+            const cy = (i: number) => (box.stack ? box.h - (i + 1) * GEOM.cell : 0);
             return <g key={id} className="vnode" data-testid={`box-${id}`} data-x={box.x} data-y={box.y} style={{ transform: `translate(${box.x}px, ${box.y}px)` }}>
               <title>{`${node.type} ${id}, length ${node.length ?? items.length}`}</title>
               {tag && <Tag names={tag}/>}
@@ -151,12 +155,17 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
                 // Only the cells whose value differs get the flash, not the whole array.
                 const cm = m === 'enter' ? 'enter' : m === 'changed' && JSON.stringify(prev?.heap[id]?.items?.[i]) !== JSON.stringify(v) ? 'changed' : '';
                 return <g key={i} className="cell"><g key={cm ? `${cm}${event.step}` : 's'} className={cm}>
-                  <rect className="cell-box" x={i * GEOM.cell} width={GEOM.cell} height={GEOM.cell}/>
-                  <text className="cell-value" x={cellCentre(i)} y={GEOM.cell / 2 + 4} textAnchor="middle">{arrowed ? '•' : fmt(v, 5)}</text></g>
-                  <text className="cell-index" x={cellCentre(i)} y={GEOM.cell + 13} textAnchor="middle">{i}</text></g>;
+                  <rect className="cell-box" x={cx(i)} y={cy(i)} width={GEOM.cell} height={GEOM.cell}/>
+                  <text className="cell-value" x={cx(i) + GEOM.cell / 2} y={cy(i) + GEOM.cell / 2 + 4} textAnchor="middle">{arrowed ? '•' : fmt(v, 5)}</text></g>
+                  {box.stack
+                    ? <text className="cell-index" x={-8} y={cy(i) + GEOM.cell / 2 + 4} textAnchor="end">{i}</text>
+                    : <text className="cell-index" x={cellCentre(i)} y={GEOM.cell + 13} textAnchor="middle">{i}</text>}</g>;
               })}
-              {items.length === 0 && omitted === 0 && <g className="cell" data-testid="empty-array"><rect className="cell-box empty" width={GEOM.cell} height={GEOM.cell}/><text className="cell-value" x={cellCentre(0)} y={GEOM.cell / 2 + 4} textAnchor="middle">[ ]</text><title>{`empty ${node.type}`}</title></g>}
-              {omitted > 0 && <g className="cell"><rect className="cell-box omitted" x={items.length * GEOM.cell} width={GEOM.cell} height={GEOM.cell}/><text className="cell-value" x={cellCentre(items.length)} y={GEOM.cell / 2 + 4} textAnchor="middle">…</text><title>{`${omitted} more not captured`}</title></g>}
+              {items.length === 0 && omitted === 0 && <g className="cell" data-testid="empty-array"><rect className="cell-box empty" width={GEOM.cell} height={GEOM.cell}/><text className="cell-value" x={GEOM.cell / 2} y={GEOM.cell / 2 + 4} textAnchor="middle">[ ]</text><title>{`empty ${node.type}`}</title></g>}
+              {omitted > 0 && <g className="cell"><rect className="cell-box omitted" x={box.stack ? 0 : items.length * GEOM.cell} y={box.stack ? 0 : 0} width={GEOM.cell} height={GEOM.cell}/><text className="cell-value" x={(box.stack ? 0 : items.length * GEOM.cell) + GEOM.cell / 2} y={GEOM.cell / 2 + 4} textAnchor="middle">…</text><title>{`${omitted} more not captured`}</title></g>}
+              {box.stack && items.length > 0 && omitted === 0 && <text className="sq-mark" data-testid="stack-top" x={GEOM.cell + 8} y={cy(items.length - 1) + GEOM.cell / 2 + 4}>top</text>}
+              {box.queue && items.length > 0 && <text className="sq-mark" data-testid="queue-front" x={cellCentre(0)} y={GEOM.cell + 28} textAnchor="middle">front</text>}
+              {box.queue && items.length > 1 && omitted === 0 && <text className="sq-mark" data-testid="queue-back" x={cellCentre(items.length - 1)} y={GEOM.cell + 28} textAnchor="middle">back</text>}
               {arrows}
             </g>;
           }
