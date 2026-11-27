@@ -146,6 +146,24 @@ class EdgeCases(unittest.TestCase):
         result = capture("a = []\nfor i in range(310):\n    a[:] = [[]]\n", max_events=2000)
         self.assertEqual(result["status"], "trace_limit")
 
+    def test_deque_is_captured_front_to_back(self):
+        result = capture("import collections\nd = collections.deque([1, 2, 3])\nd.appendleft(0)\nd.pop()\n")
+        self.assertEqual(result["status"], "ok")
+        last = result["events"][-1]
+        node = last["heap"][locals_of(last)["d"]["id"]]
+        self.assertEqual(node["type"], "deque")
+        self.assertEqual([item["value"] for item in node["items"]], [0, 1, 2])
+        self.assertEqual(node["length"], 3)
+
+    def test_deque_subclass_keeps_the_fields_path(self):
+        # Only the exact built-in is a queue: a subclass can override the order, so it keeps its own fields.
+        result = capture("import collections\nclass Bag(collections.deque):\n    pass\nb = Bag([1, 2])\nb.note = 'mine'\n")
+        self.assertEqual(result["status"], "ok")
+        last = result["events"][-1]
+        node = last["heap"][locals_of(last)["b"]["id"]]
+        self.assertNotIn("items", node)
+        self.assertEqual(node["fields"]["note"]["value"], "mine")
+
     def test_stderr_and_eof(self):
         result = capture("import sys\nprint('warning', file=sys.stderr)\nx = input()\n")
         self.assertEqual(result["stderr"], "warning\n")
