@@ -88,6 +88,9 @@ footer { color:var(--muted); font-size:11px; border-top:1px solid var(--line); m
 .node-dot { fill:var(--accent); }
 .arrow { fill:none; stroke:var(--accent); stroke-width:2; animation:arrow-in .35s ease both; }
 .arrowhead { fill:var(--accent); }
+.arrow.live { stroke-width:2.6; }
+.arrow.muted { stroke:var(--muted); stroke-width:1.5; opacity:.45; }
+.arrowhead-muted { fill:var(--muted); opacity:.45; }
 .tag rect { fill:var(--chosen); stroke:var(--accent); stroke-width:1; }
 .tag text { fill:var(--ink); font:600 11px 'SFMono-Regular',Consolas,monospace; }
 .tag path { fill:var(--accent); }
