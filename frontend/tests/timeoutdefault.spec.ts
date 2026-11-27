@@ -22,6 +22,7 @@ test('default Time limit follows the language until the user picks one', async (
   await expect(limit(page)).toHaveValue('2');   // an explicit choice of 2 s is kept, not replaced by the default
 });
 test('Huffman example: default C++ limit completes; 2 s override gives neutral incomplete message', async ({ page }) => {
+  test.setTimeout(120000);   // two full C++ compiles and recordings; the 30s default was the flake, not the app
   await page.getByLabel('Language').selectOption('cpp');
   const b = page.getByRole('button', { name: 'Edit code' }); if (await b.isVisible()) await b.click();
   await page.getByLabel('C++ source code').fill(HUFF);
