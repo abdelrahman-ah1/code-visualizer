@@ -1,7 +1,7 @@
-import { memo, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { TraceEvent } from '../types';
 import { CARD, GEOM, REC, arrayOmitted, cardRows, portY, cellCentre, changedBetween, fmt, laneSummary, linkFieldsByType, linkPath, recGeom, graphSpec, vertexCutOff, vertexDisplay, vertexEdges } from '../structures';
-import type { Scene } from '../structures';
+import type { Link, Scene } from '../structures';
 import type { Value } from '../types';
 
 // Draws one Scene. Layout comes from structures.ts. This file only turns boxes and arrows into SVG.
@@ -15,6 +15,7 @@ function Tag({ names }: { names: string[] }) {
 }
 
 const clipText = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
+const MARK_W = (t: string) => t.length * 6.6 + 6;   // the sq-mark font is 10px monospace: measure before placing
 function cardText(v: Value | null, nullWord: string, note?: string) {
   if (!v) return note ?? '';
   if (v.kind === 'scalar' && v.value === null) return nullWord;
@@ -34,7 +35,8 @@ function Pointer({ name, value, x, y, drawn, nullWord, strip }: { name: string; 
 const ORPHAN_HINT = 'Not reachable through the captured roots at this step: no captured local, global, file-level static or top-level function-static leads to this block, directly or through other blocks. It is still allocated, so this is not a leak report. Statics in nested blocks or lambdas, thread-locals, registers and unmanaged buffers are not captured.';
 export const Structures = memo(function Structures({ scene, event, prev, prevScene, nullWord = 'None' }: { scene: Scene; event: TraceEvent; prev?: TraceEvent; prevScene?: Scene; nullWord?: string }) {
   const [zoom, setZoom] = useState(1), box = useRef<HTMLDivElement>(null), drag = useRef<{ x: number; y: number; l: number; t: number } | null>(null);
-  const setZ = (z: number) => setZoom(Math.min(2.5, Math.max(0.2, Math.round(z * 100) / 100)));
+  const userZoom = useRef(false);   // once the reader sets a zoom, the panel stops fitting scenes for them
+  const setZ = (z: number) => { userZoom.current = true; setZoom(Math.min(2.5, Math.max(0.2, Math.round(z * 100) / 100))); };
   const pan = (dx: number, dy: number) => box.current?.scrollBy({ left: dx, top: dy, behavior: 'smooth' });
   const fit = () => { const el = box.current; if (el) setZ(Math.min(1.5, (el.clientWidth - 12) / scene.width, (el.clientHeight - 12) / scene.height)); el?.scrollTo({ left: 0, top: 0 }); };
   const { changed } = useMemo(() => changedBetween(prev, event), [prev, event]);
@@ -42,12 +44,24 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
   const summaries = scene.lanes.map((lane) => laneSummary(lane, event, scene));
   const linksFrom = (id: string) => scene.links.filter((l) => l.from === id);
   const mark = (id: string) => (prevScene && !prevScene.boxes[id] ? 'enter' : changed.has(id) ? 'changed' : '');
+  // The arrows that touch what this step changed stay in the accent colour; the rest go quiet, so one step reads as one path.
+  const anyChange = changed.size > 0, live = (l: Link) => changed.has(l.from) || changed.has(l.to);
+  const arrowCls = (l: Link) => (!anyChange ? 'arrow' : live(l) ? 'arrow live' : 'arrow muted');
+  const arrowHead = (l: Link) => (!anyChange || live(l) ? 'url(#cv-arrowhead)' : 'url(#cv-arrowhead-muted)');
+  // A scene taller than the panel opens fitted instead of at 100 percent; the reader's own zoom always wins.
+  // Fitted no further than 45 percent: below that nothing is readable, so a phone pans rather than shrinks to a stamp.
+  useEffect(() => {
+    if (userZoom.current) return;
+    const el = box.current; if (!el) return;
+    const k = Math.min((el.clientWidth - 12) / scene.width, (el.clientHeight - 12) / scene.height, 1);
+    setZoom(k < 0.95 ? Math.min(1, Math.max(0.45, Math.round(k * 100) / 100)) : 1);
+  }, [scene.width, scene.height]);
   const renderRecord = (id: string, b: Scene['boxes'][string], node: TraceEvent['heap'][string], tag: string[] | undefined, m: string, chainField?: string) => {
     const g = recGeom(node, chainField), sp = g.split, mainW = REC.mainW, mid = mainW / 2;
     const fmtData = (v: Value) => (v.kind === 'scalar' && v.value === null ? nullWord : fmt(v, 8));
     const mainText = sp.main ? fmt(sp.main[1], 8) : '', mainY = sp.rest.length + (sp.moreData ? 1 : 0) === 0 ? g.mainH / 2 + 5 : 22;
     const drawn = (v: Value) => v.kind === 'ref' && !!scene.boxes[v.id];
-    const arrows = linksFrom(id).map((l) => { const d = linkPath(l, scene.boxes); return d && <path key={`${l.cell ?? 'n'}>${l.to}${l.port ? 'p' : ''}`} className="arrow" data-from={l.from} data-to={l.to} d={d} markerEnd="url(#cv-arrowhead)"/>; });
+    const arrows = linksFrom(id).map((l) => { const d = linkPath(l, scene.boxes); return d && <path key={`${l.cell ?? 'n'}>${l.to}${l.port ? 'p' : ''}`} className={arrowCls(l)} data-from={l.from} data-to={l.to} d={d} markerEnd={arrowHead(l)}/>; });
     return <g key={id} className="vnode" data-testid={`box-${id}`} data-x={b.x} data-y={b.y} style={{ transform: `translate(${b.x}px, ${b.y}px)` }}>
       <title>{`${node.type} ${id}${node.address ? ` at ${node.address}` : ''}: ${Object.entries(node.fields ?? {}).map(([k, v]) => `${k}=${v.kind === 'ref' ? v.id : fmt(v, 20)}`).join(', ')}`}</title>
       {tag && <Tag names={tag}/>}
@@ -85,7 +99,7 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
         {cut > 0 && <text className="node-rest" x={b.w / 2} y={mainY + 15 + (d.rest.length + (d.more > 0 ? 1 : 0)) * REC.line} textAnchor="middle" data-testid="edges-cut"><title>{`${cut} neighbour-list item${cut === 1 ? '' : 's'} not captured by the recording`}</title>{`${cut} edge${cut === 1 ? '' : 's'} not captured`}</text>}
       </g>
       <text className="node-id" x="9" y="12">{id}</text>
-      {linksFrom(id).map((l) => { const p = linkPath(l, scene.boxes); return p && <g key={`g>${l.to}`} data-testid={`edge-${l.from}-${l.to}`}><path className="arrow" data-from={l.from} data-to={l.to} d={p} markerEnd="url(#cv-arrowhead)" markerStart={l.both ? 'url(#cv-arrowhead)' : undefined}/>{l.label && l.mid && <text className="edge-label" x={l.mid.x} y={l.mid.y - 4} textAnchor="middle">{l.label}</text>}</g>; })}
+      {linksFrom(id).map((l) => { const p = linkPath(l, scene.boxes); return p && <g key={`g>${l.to}`} data-testid={`edge-${l.from}-${l.to}`}><path className={arrowCls(l)} data-from={l.from} data-to={l.to} d={p} markerEnd={arrowHead(l)} markerStart={l.both ? arrowHead(l) : undefined}/>{l.label && l.mid && <text className="edge-label" x={l.mid.x} y={l.mid.y - 4} textAnchor="middle">{l.label}</text>}</g>; })}
     </g>;
   };
   // An adjacency-list graph vertex: a circle labelled by its index. Its arrows come from the inner lists (scene.links,
@@ -100,7 +114,7 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
         <circle className="node-box vertex-circle" cx={b.w / 2} cy={b.h / 2} r={b.w / 2}/>
         <text className="node-main" x={b.w / 2} y={b.h / 2 + 5} textAnchor="middle">{label}</text>
       </g>
-      {linksFrom(id).map((l) => { const pth = linkPath(l, scene.boxes); return pth && <g key={`g>${l.to}`} data-testid={`edge-${l.from}-${l.to}`}><path className="arrow" data-from={l.from} data-to={l.to} d={pth} markerEnd="url(#cv-arrowhead)" markerStart={l.both ? 'url(#cv-arrowhead)' : undefined}/>{l.label && l.mid && <text className="edge-label" x={l.mid.x} y={l.mid.y - 4} textAnchor="middle">{l.label}</text>}</g>; })}
+      {linksFrom(id).map((l) => { const pth = linkPath(l, scene.boxes); return pth && <g key={`g>${l.to}`} data-testid={`edge-${l.from}-${l.to}`}><path className={arrowCls(l)} data-from={l.from} data-to={l.to} d={pth} markerEnd={arrowHead(l)} markerStart={l.both ? arrowHead(l) : undefined}/>{l.label && l.mid && <text className="edge-label" x={l.mid.x} y={l.mid.y - 4} textAnchor="middle">{l.label}</text>}</g>; })}
     </g>;
   };
   const adjGroups = scene.adjGroups ?? [];
@@ -117,7 +131,7 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
       onPointerMove={(e) => { const d = drag.current; if (d && box.current && e.buttons === 1) box.current.scrollTo({ left: d.l - (e.clientX - d.x), top: d.t - (e.clientY - d.y) }); }}
       onPointerUp={() => { drag.current = null; }} onPointerLeave={() => { drag.current = null; }}>
       <svg width={Math.ceil(scene.width * zoom)} height={Math.ceil(scene.height * zoom)} viewBox={`0 0 ${scene.width} ${scene.height}`} role="img" aria-label={summaries.join('. ')} data-testid="structure-svg" data-zoom={zoom}>
-        <defs><marker id="cv-arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" className="arrowhead"/></marker></defs>
+        <defs><marker id="cv-arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" className="arrowhead"/></marker><marker id="cv-arrowhead-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" className="arrowhead-muted"/></marker></defs>
         {scene.cards.map((id) => {
           const b = scene.boxes[id], node = event.heap[id], tag = scene.tags[id], m = mark(id);
           if (b.vertex) return renderVertex(id, b, node, tag, m);
@@ -135,12 +149,12 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
                   <text className={`card-value${r.note ? ' note' : ''}`} x={b.w - (isRef ? 22 : 10)} y={portY(i) + 4} textAnchor="end">{isRef && !ok ? `${(r.value as { id: string }).id} missing` : isRef ? (r.value as { id: string }).id : cardText(r.value, nullWord, r.note)}</text>
                   {ok && <circle className="node-dot" cx={b.w - 10} cy={portY(i)} r="3.5"/>}</g>; })}
             </g>
-            {linksFrom(id).map((l) => { const d = linkPath(l, scene.boxes); return d && <path key={`${l.cell}>${l.to}`} className="arrow" data-from={l.from} data-to={l.to} d={d} markerEnd="url(#cv-arrowhead)"/>; })}
+            {linksFrom(id).map((l) => { const d = linkPath(l, scene.boxes); return d && <path key={`${l.cell}>${l.to}`} className={arrowCls(l)} data-from={l.from} data-to={l.to} d={d} markerEnd={arrowHead(l)}/>; })}
           </g>;
         })}
         {scene.lanes.map((lane) => lane.ids.map((id) => {
           const box = scene.boxes[id], node = event.heap[id], tag = scene.tags[id], m = mark(id);
-          const arrows = linksFrom(id).map((l) => { const d = linkPath(l, scene.boxes); return d && <path key={`${l.cell ?? 'n'}>${l.to}${l.port ? 'p' : ''}`} className="arrow" data-from={l.from} data-to={l.to} d={d} markerEnd="url(#cv-arrowhead)"/>; });
+          const arrows = linksFrom(id).map((l) => { const d = linkPath(l, scene.boxes); return d && <path key={`${l.cell ?? 'n'}>${l.to}${l.port ? 'p' : ''}`} className={arrowCls(l)} data-from={l.from} data-to={l.to} d={d} markerEnd={arrowHead(l)}/>; });
           if (lane.kind === 'array') {
             const items = node.items ?? [], omitted = arrayOmitted(node), cells = Math.max(1, items.length + (omitted > 0 ? 1 : 0));
             // A stack is a vertical column, cell 0 at the bottom, top marked; a queue is horizontal with front/back marks.
@@ -164,8 +178,15 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
               {items.length === 0 && omitted === 0 && <g className="cell" data-testid="empty-array"><rect className="cell-box empty" width={GEOM.cell} height={GEOM.cell}/><text className="cell-value" x={GEOM.cell / 2} y={GEOM.cell / 2 + 4} textAnchor="middle">[ ]</text><title>{`empty ${node.type}`}</title></g>}
               {omitted > 0 && <g className="cell"><rect className="cell-box omitted" x={box.stack ? 0 : items.length * GEOM.cell} y={box.stack ? 0 : 0} width={GEOM.cell} height={GEOM.cell}/><text className="cell-value" x={(box.stack ? 0 : items.length * GEOM.cell) + GEOM.cell / 2} y={GEOM.cell / 2 + 4} textAnchor="middle">…</text><title>{`${omitted} more not captured`}</title></g>}
               {box.stack && items.length > 0 && omitted === 0 && <text className="sq-mark" data-testid="stack-top" x={GEOM.cell + 8} y={cy(items.length - 1) + GEOM.cell / 2 + 4}>top</text>}
-              {box.queue && items.length > 0 && <text className="sq-mark" data-testid="queue-front" x={cellCentre(0)} y={GEOM.cell + 28} textAnchor="middle">front</text>}
-              {box.queue && items.length > 1 && omitted === 0 && <text className="sq-mark" data-testid="queue-back" x={cellCentre(items.length - 1)} y={GEOM.cell + 28} textAnchor="middle">back</text>}
+              {/* Front and back are marks under the first and last cell, but two marks that would touch are drawn as one caption
+                  instead: a one-cell queue used to draw "front" and "back" on top of each other. */}
+              {box.queue && items.length > 0 && (() => {
+                const fx = cellCentre(0), bx = cellCentre(items.length - 1), gap = Math.abs(bx - fx), need = (MARK_W('front') + MARK_W('back')) / 2;
+                const back = items.length > 1 && omitted === 0;
+                return !back || gap < need
+                  ? <text className="sq-mark" data-testid="queue-front" x={(fx + bx) / 2} y={GEOM.cell + 28} textAnchor="middle">{back ? 'front · back' : 'front'}</text>
+                  : <g><text className="sq-mark" data-testid="queue-front" x={fx} y={GEOM.cell + 28} textAnchor="middle">front</text><text className="sq-mark" data-testid="queue-back" x={bx} y={GEOM.cell + 28} textAnchor="middle">back</text></g>;
+              })()}
               {arrows}
             </g>;
           }
