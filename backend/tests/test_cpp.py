@@ -71,6 +71,36 @@ class Supported(unittest.TestCase):
         self.assertEqual(names.count("swap_first_two"), 1)
         self.assertEqual(len([e for e in r["events"] if e["event"] == "return"]), 5)  # 3 + 1 + main
 
+    def test_queue_stack_priority_queue_show_their_contents(self):
+        # Container adaptors hold no elements themselves: the tracer reads the underlying container `c`.
+        r = run("adaptors")
+        self.assertEqual((r["status"], r["complete"]), ("ok", True))
+        # At the `return 0;` line all three adaptors and the plain struct hold their final contents.
+        # (The last event of the run is past teardown: every container reads as a released buffer there,
+        # adaptors and plain std::vector alike.)
+        ev = next(e for e in r["events"] if e["event"] == "line" and e["line"] == 23)
+        local = ev["frames"][-1]["locals"]
+
+        def items(name):
+            node = ev["heap"][local[name]["id"]]
+            return node, [item["value"] for item in node["items"]]
+
+        node, values = items("q")
+        self.assertEqual((node["type"], node["element_type"]), ("std::queue", "int"))
+        self.assertEqual(values, [20, 30])          # front to back
+        node, values = items("s")
+        self.assertEqual((node["type"], node["element_type"]), ("std::stack", "int"))
+        self.assertEqual(values, [1, 2, 3])         # bottom to top: the top comes last
+        node, values = items("pq")
+        self.assertEqual((node["type"], node["element_type"]), ("std::priority_queue", "int"))
+        self.assertEqual(values[0], 9)              # heap order: the top comes first, the rest is storage order
+        self.assertEqual(sorted(values), [1, 5, 9])
+        # A user type that only shares the name is not an adaptor: plain struct fields, no items.
+        mine = ev["heap"][local["mine"]["id"]]
+        self.assertNotIn("items", mine)
+        self.assertEqual(mine["fields"]["front"]["value"], 7)
+        self.assertEqual(mine["type"], "queue")
+
     def test_huffman_slow_recording_has_neutral_incomplete_message(self):
         # priority_queue program: about 280 steps, needs more than 2 s on a typical machine.
         short = run("huffman_priority_queue", timeout=0.6, max_events=2000)
