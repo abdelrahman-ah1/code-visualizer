@@ -67,7 +67,7 @@ Values are tagged:
 - `opaque`: function, class, built-in function or module, with no traversal.
 - `truncated`: value omitted at a depth or scalar limit.
 
-Heap nodes describe exact built-in lists/tuples (`items`), dictionaries (`entries`, an ordered list of key/value pairs), or ordinary objects (`fields`). Other types can be opaque nodes. Sets, custom container subclasses, slots and descriptors are not modeled as normal supported data structures.
+Heap nodes describe exact built-in lists/tuples (`items`), `collections.deque` (`items`, front-to-back order), dictionaries (`entries`, an ordered list of key/value pairs), or ordinary objects (`fields`). Other types can be opaque nodes. Sets, custom container subclasses, slots and descriptors are not modeled as normal supported data structures.
 
 IDs persist across snapshots in one run. They are not memory addresses and are not comparable across runs. Shared references use the same ID. A shallow copy has a different outer ID but may share nested IDs. A cycle can refer to a node already present in the same heap.
 
@@ -90,6 +90,7 @@ Schema evolution: new meanings for existing fields require a new major version. 
 ## Milestone 5 additions (optional, additive; version stays codeviz.trace/1.0)
 See CPP_LIMITS.md. Top level: `diagnostics` (array of {source, severity, kind, line?, message}), `exit_code`, `compile_ms`, `trace_ms`.
 Heap nodes: `storage` ("stack"|"heap"|"global"), `address`, `freed` (bool, observed free), `element_type`; node types `array`, `std::vector`.
+Container adaptors `std::queue`, `std::stack` and `std::priority_queue` are captured as `items` read from the adaptor's underlying container: `std::queue` runs front to back, `std::stack` bottom to top, and `std::priority_queue` keeps heap order (its real storage order, not sorted order). The node `type` is the adaptor's base name (for example `std::stack`), with `element_type` from the first template argument.
 Frame named `<globals>` holds C++ globals. Readers that ignore unknown fields keep working.
 
 ## Optional `unreached_heap` (C++ snapshots)
