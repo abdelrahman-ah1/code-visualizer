@@ -88,6 +88,22 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
       {linksFrom(id).map((l) => { const p = linkPath(l, scene.boxes); return p && <g key={`g>${l.to}`} data-testid={`edge-${l.from}-${l.to}`}><path className="arrow" data-from={l.from} data-to={l.to} d={p} markerEnd="url(#cv-arrowhead)" markerStart={l.both ? 'url(#cv-arrowhead)' : undefined}/>{l.label && l.mid && <text className="edge-label" x={l.mid.x} y={l.mid.y - 4} textAnchor="middle">{l.label}</text>}</g>; })}
     </g>;
   };
+  // An adjacency-list graph vertex: a circle labelled by its index. Its arrows come from the inner lists (scene.links,
+  // paths already laid out). Not a heap object, so no id tag; the title keeps it inspectable.
+  const renderAdjVertex = (id: string, g: NonNullable<Scene['adjGroups']>[number]) => {
+    const b = scene.boxes[id]; if (!b) return null;
+    const m = mark(id), label = id.slice(id.indexOf('#') + 1);
+    const out = linksFrom(id).filter((l) => l.to !== id).map((l) => l.to.slice(l.to.indexOf('#') + 1)), self = linksFrom(id).some((l) => l.to === id);
+    return <g key={id} className="vnode vertex adjv" data-testid={`box-${id}`} data-x={b.x} data-y={b.y} style={{ transform: `translate(${b.x}px, ${b.y}px)` }}>
+      <title>{`vertex ${label} of ${g.label}: ${out.length ? `edges to ${out.join(', ')}` : 'no edges'}${self ? ' (and itself)' : ''}; adjacency list ${g.outer}`}</title>
+      <g key={m ? `${m}${event.step}` : 's'} className={m}>
+        <circle className="node-box vertex-circle" cx={b.w / 2} cy={b.h / 2} r={b.w / 2}/>
+        <text className="node-main" x={b.w / 2} y={b.h / 2 + 5} textAnchor="middle">{label}</text>
+      </g>
+      {linksFrom(id).map((l) => { const pth = linkPath(l, scene.boxes); return pth && <g key={`g>${l.to}`} data-testid={`edge-${l.from}-${l.to}`}><path className="arrow" data-from={l.from} data-to={l.to} d={pth} markerEnd="url(#cv-arrowhead)" markerStart={l.both ? 'url(#cv-arrowhead)' : undefined}/>{l.label && l.mid && <text className="edge-label" x={l.mid.x} y={l.mid.y - 4} textAnchor="middle">{l.label}</text>}</g>; })}
+    </g>;
+  };
+  const adjGroups = scene.adjGroups ?? [];
   return <section className="panel structures" aria-label="Structures">
     <div className="structures-head"><h2>Structures <small>every captured object: lists, arrays, and object cards</small></h2>
       <div className="zoom-bar" role="group" aria-label="Zoom and pan the diagram">
@@ -95,8 +111,8 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
         <button type="button" aria-label="Zoom out" onClick={() => setZ(zoom / 1.25)}>−</button><output data-testid="zoom-level">{Math.round(zoom * 100)}%</output><button type="button" aria-label="Zoom in" onClick={() => setZ(zoom * 1.25)}>+</button>
         <button type="button" onClick={fit}>Fit all</button><button type="button" onClick={() => setZ(1)}>100%</button></div></div>
     <ul className="sr-only" data-testid="lane-summaries">{summaries.map((s, i) => <li key={i}>{s}</li>)}</ul>
-    {!scene.lanes.length && !scene.cards.length && <p className="empty" data-testid="structures-empty">No linked-list nodes or arrays at this snapshot.{scene.nulls.length > 0 && ` ${nullWord}: ${scene.nulls.join(', ')}.`}</p>}
-    {(scene.lanes.length > 0 || scene.cards.length > 0) && <div className="structure-scroll" ref={box} tabIndex={0} role="group" aria-label="Structure diagram. Drag, use arrow keys or the pan buttons to move; zoom with the buttons"
+    {!scene.lanes.length && !scene.cards.length && !adjGroups.length && <p className="empty" data-testid="structures-empty">No linked-list nodes or arrays at this snapshot.{scene.nulls.length > 0 && ` ${nullWord}: ${scene.nulls.join(', ')}.`}</p>}
+    {(scene.lanes.length > 0 || scene.cards.length > 0 || adjGroups.length > 0) && <div className="structure-scroll" ref={box} tabIndex={0} role="group" aria-label="Structure diagram. Drag, use arrow keys or the pan buttons to move; zoom with the buttons"
       onPointerDown={(e) => { if (e.button === 0 && box.current) drag.current = { x: e.clientX, y: e.clientY, l: box.current.scrollLeft, t: box.current.scrollTop }; }}
       onPointerMove={(e) => { const d = drag.current; if (d && box.current && e.buttons === 1) box.current.scrollTo({ left: d.l - (e.clientX - d.x), top: d.t - (e.clientY - d.y) }); }}
       onPointerUp={() => { drag.current = null; }} onPointerLeave={() => { drag.current = null; }}>
@@ -146,6 +162,15 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
           }
           return renderRecord(id, box, node, tag, m, linkField.get(node.type));
         }))}
+              {adjGroups.map((g) => {
+          const vs = g.vertices.map((id) => scene.boxes[id]).filter(Boolean);
+          if (!vs.length) return null;
+          const x0 = Math.min(...vs.map((b) => b.x)), y0 = Math.min(...vs.map((b) => b.y));
+          return <g key={g.outer} data-testid={`adj-group-${g.outer}`}>
+            <text className="adj-caption" data-testid={`adj-caption-${g.outer}`} x={x0} y={y0 - 12}>{`${g.label}: graph, ${g.vertices.length} vertices`}</text>
+            {g.vertices.map((id) => renderAdjVertex(id, g))}
+          </g>;
+        })}
       </svg></div>}
     {(scene.lanes.length > 0 || scene.cards.length > 0) && scene.nulls.length > 0 && <p className="hint">{nullWord}: {scene.nulls.join(', ')}</p>}
     {Object.values(event.heap).some((n) => n.orphan && !n.freed) && <p className="hint" data-testid="orphan-legend">Dashed outline, "unreferenced": {ORPHAN_HINT}</p>}
