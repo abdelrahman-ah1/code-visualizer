@@ -519,12 +519,13 @@ export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<nu
     else if (v.kind === 'scalar' && v.value === null && !nulls.includes(label)) nulls.push(label);
   }
   for (const l of links) if (vertexSet.has(l.to) && !vertexSet.has(l.from)) { const d = pointerToVertex(l, boxes); if (d) l.d = d; }   // M6: clean curves into vertices
-  const routed = route ? routeLinks(links.filter((l) => !l.d), boxes, width, tags) : { maxX: 0, needs: new Map<number, number>() };   // route=false: layout state only, arrows get routed when the scene is shown
+  const routed = route ? routeLinks(links.filter((l) => !l.d), boxes, width, tags) : { maxX: 0, maxY: 0, needs: new Map<number, number>() };   // route=false: layout state only, arrows get routed when the scene is shown
   if (!extra && routed.needs.size) return buildScene(event, state, routed.needs);   // lay out again with room for the channels
   width = Math.max(width, routed.maxX);
   const undrawn: { id: string; type: string }[] = []; // every captured object now has a box
   const adjGroups: AdjGroup[] = adjSpecs.map((a) => ({ outer: a.outer, label: `${(adjNameOf.get(a.outer) ?? []).join(', ') || a.outer} (${heap[a.outer].type})`, vertices: a.lists.map((_, i) => `${a.outer}#${i + a.base}`) }));
-  return { lanes, boxes, links: graphLinks.length ? [...links, ...graphLinks] : links, tags, nulls, cards: [...cardIds, ...gs.vertices], graph: gs, adjGroups, undrawn, width, height: totalH + 40 };   // room for same-row arrows that drop under the row
+  // Tall enough for the arrows as well as the boxes: a curve that runs under a row used to be drawn outside the SVG and clipped.
+  return { lanes, boxes, links: graphLinks.length ? [...links, ...graphLinks] : links, tags, nulls, cards: [...cardIds, ...gs.vertices], graph: gs, adjGroups, undrawn, width, height: Math.max(totalH + 40, routed.maxY + 24) };   // room for same-row arrows that drop under the row
 }
 
 // All scenes for a trace, built once in order so lane choices carry forward. Stepping backward just indexes this array.
@@ -610,7 +611,9 @@ function basePath(link: Link, boxes: Record<string, Box>): string | null {
       return `M ${sx} ${sy} C ${sx} ${sy + low}, ${ex} ${dy + low}, ${ex} ${bottom}`;
     }
     if (link.port && b.kind === 'array' && dy < 0) return `M ${sx} ${sy} C ${a.w + 40} ${sy}, ${dx + b.w + 50} ${dy + b.h / 2}, ${dx + b.w + 1} ${dy + b.h / 2}`;   // pointer to an array above: come in from its right end, not through its cells
-    if (a.kind === 'card' && a.rec && b.rec && dy > a.h) return `M ${sx} ${sy} C ${a.w + 36} ${sy}, ${tx} ${ty - 45}, ${tx} ${dy - 1}`;   // tree edge: out of the pointer compartment, down into the child's top edge
+    // Tree edge: out of the pointer compartment, down into the child's top edge. The curve leans towards the child
+    // instead of always bowing right, so a node's left and right edges no longer cross each other.
+    if (a.kind === 'card' && a.rec && b.rec && dy > a.h) return `M ${sx} ${sy} C ${sx + (tx - sx) * 0.3} ${sy + (ty - sy) * 0.4}, ${tx} ${ty - 40}, ${tx} ${dy - 1}`;
     if (right) return `M ${sx} ${sy} C ${sx + 40} ${sy}, ${dx - 40} ${dy + b.h / 2}, ${dx - 3} ${dy + b.h / 2}`;
     return `M ${sx} ${sy} C ${sx + 50} ${sy + 20}, ${tx} ${ty - 60}, ${tx} ${ty}`;
   }
@@ -708,7 +711,7 @@ export function labelRects(boxes: Record<string, Box>, tags: Record<string, stri
   }
   return out;
 }
-const segHits = (pts: Pt[], rects: Label[], skip: (r: Box) => boolean): boolean => {   // axis-aligned or diagonal segments against caption rectangles
+const segHits = (pts: Pt[], rects: Label[], skip: (r: Label) => boolean): boolean => {   // axis-aligned or diagonal segments against caption rectangles
   for (let i = 1; i < pts.length; i++) {
     const x0 = Math.min(pts[i].x, pts[i - 1].x), x1 = Math.max(pts[i].x, pts[i - 1].x), y0 = Math.min(pts[i].y, pts[i - 1].y), y1 = Math.max(pts[i].y, pts[i - 1].y);
     for (const r of rects) {
@@ -720,30 +723,60 @@ const segHits = (pts: Pt[], rects: Label[], skip: (r: Box) => boolean): boolean 
   return false;
 };
 // Routing depends only on box geometry, the link list and the name pills, and most steps change none of them, so the last results are kept.
-const routeCache = new Map<string, { paths: (string | undefined)[]; maxX: number; needs: Map<number, number> }>();
-export function routeLinks(links: Link[], boxes: Record<string, Box>, sceneW: number, tags: Record<string, string[]> = {}): { maxX: number; needs: Map<number, number> } {
+const routeCache = new Map<string, { paths: (string | undefined)[]; maxX: number; maxY: number; needs: Map<number, number> }>();
+export function routeLinks(links: Link[], boxes: Record<string, Box>, sceneW: number, tags: Record<string, string[]> = {}): { maxX: number; maxY: number; needs: Map<number, number> } {
   let sig = `${Math.round(sceneW)}|`;
   for (const b of Object.values(boxes)) sig += `${b.id},${b.kind[0]},${Math.round(b.x)},${Math.round(b.y)},${b.w},${b.h},${b.lane}${b.rec ? 'r' : ''};`;
   for (const l of links) sig += `${l.from}.${l.cell ?? ''}.${l.to}.${l.port ? `${l.port.x},${l.port.y}` : ''};`;
   for (const k of Object.keys(tags)) sig += `${k}=${tags[k].join(',').length}|`;
   const hit = routeCache.get(sig);
-  if (hit) { links.forEach((l, i) => { const d = hit.paths[i]; if (d) routeOf.set(l, d); }); return { maxX: hit.maxX, needs: hit.needs }; }
+  if (hit) { links.forEach((l, i) => { const d = hit.paths[i]; if (d) routeOf.set(l, d); }); return { maxX: hit.maxX, maxY: hit.maxY, needs: hit.needs }; }
   const out = routeLinksCompute(links, boxes, sceneW, tags);
   if (routeCache.size >= 24) routeCache.delete(routeCache.keys().next().value!);
-  routeCache.set(sig, { paths: links.map((l) => routeOf.get(l)), maxX: out.maxX, needs: out.needs });
+  routeCache.set(sig, { paths: links.map((l) => routeOf.get(l)), maxX: out.maxX, maxY: out.maxY, needs: out.needs });
   return out;
 }
-function routeLinksCompute(links: Link[], boxes: Record<string, Box>, sceneW: number, tags: Record<string, string[]>): { maxX: number; needs: Map<number, number> } {
+// Three or more arrows leaving one card or node for different targets: one spine out of the source, then each branch
+// runs down the spine to the free gap just above its target's row, across that gap, and into the target's top edge.
+// Branches to one row share that gap line, so a fan reads as one trunk with short branches instead of crossing curves.
+function trunkPaths(fan: { link: Link; a: Box; b: Box; port: Pt }[], boxes: Record<string, Box>, labels: Label[]): Map<Link, string> | null {
+  const a = fan[0].a, all = Object.values(boxes), items = fan.slice().sort((p, q) => p.b.y - q.b.y || p.b.x - q.b.x), out = new Map<Link, string>();
+  const exitX = a.x + a.w + 8;
+  for (const { link, b, port } of items) {
+    if (b.y < a.y + a.h + 10) return null;     // a target beside or above the source keeps its ordinary curve
+    const start = { x: a.x + port.x, y: a.y + port.y }, gy = b.y - 12, tx = b.x + b.w - 10;
+    const pts: Pt[] = [start, { x: exitX, y: start.y }, { x: exitX, y: gy }, { x: tx, y: gy }, { x: tx, y: b.y - 3 }];
+    if (polyHits(densify(pts), all, new Set([a.id, b.id])) || segHits(pts, labels, (l) => l.owner === a.id || l.owner === b.id)) return null;
+    out.set(link, rounded(pts, a));
+  }
+  return out.size === items.length ? out : null;
+}
+function routeLinksCompute(links: Link[], boxes: Record<string, Box>, sceneW: number, tags: Record<string, string[]>): { maxX: number; maxY: number; needs: Map<number, number> } {
   const all = Object.values(boxes), needs = new Map<number, number>();
-  if (!all.length) return { maxX: 0, needs };
+  if (!all.length) return { maxX: 0, maxY: 0, needs };
   const maxRight = Math.max(sceneW - 28, ...all.map((o) => o.x + o.w));
   type R = { link: Link; a: Box; b: Box; start: Pt; base: string };
   const labels = labelRects(boxes, tags);
   const srcCount = new Map<string, number>(); for (const l of links) srcCount.set(l.from, (srcCount.get(l.from) ?? 0) + 1);
+  // The scene must be tall enough for every path drawn here, not only for its boxes.
+  let maxY = 0;
+  const note = (pts: Pt[]) => { for (const p of pts) if (p.y > maxY) maxY = p.y; };
+  // A fan of three or more arrows out of one card or node becomes one trunk with short branches: the branch spine runs
+  // down the free gap right of the source, and each branch turns off at the gap above its target's row.
+  const fanBy = new Map<string, { link: Link; a: Box; b: Box; port: Pt }[]>();
+  for (const link of links) { const a = boxes[link.from], b = boxes[link.to]; if (!a || !b || a === b || !link.port) continue; (fanBy.get(a.id) ?? fanBy.set(a.id, []).get(a.id)!).push({ link, a, b, port: link.port }); }
+  const trunked = new Set<Link>();
+  for (const fan of fanBy.values()) {
+    if (fan.length < 3 || new Set(fan.map((x) => x.b.id)).size < 3) continue;
+    const paths = trunkPaths(fan, boxes, labels);
+    if (!paths) continue;
+    for (const [l, d] of paths) { routeOf.set(l, d); trunked.add(l); const p = fan.find((x) => x.link === l)!; note([{ x: p.a.x + p.port.x, y: p.a.y + p.port.y }, { x: p.b.x + p.b.w - 10, y: p.b.y - 3 }]); }
+  }
   const bad: R[] = [], good: { link: Link; a: Box; pts: Pt[] }[] = [];
   for (const link of links) {
     const a = boxes[link.from], b = boxes[link.to];
     if (!a || !b || a === b) continue;
+    if (trunked.has(link)) continue;
     const base = basePath(link, boxes);
     if (!base) continue;
     const pts = sampleBase(base, a);
@@ -756,6 +789,7 @@ function routeLinksCompute(links: Link[], boxes: Record<string, Box>, sceneW: nu
       for (const p of pts) { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; }
       for (const o of labels) { if (o.owner === a.id || o.owner === b.id || o.x > x1 || o.x + o.w < x0 || o.y > y1 || o.y + o.h < y0) continue; if (pts.some((p) => inside(p, o, 0))) { overCaption = true; break; } }
     }
+    if (pts.length) note(pts);
     if (pts.length && (polyHits(pts, all, new Set(fromArrayCell ? [b.id] : [a.id, b.id])) > 0 || overCaption)) bad.push(r);
     else good.push({ link, a, pts: (srcCount.get(link.from) ?? 0) <= 8 ? densify(pts) : [] });
     (r as R & { pts?: Pt[] }).pts = pts;
@@ -779,7 +813,7 @@ function routeLinksCompute(links: Link[], boxes: Record<string, Box>, sceneW: nu
   good.forEach((g, j) => { if (movedSrc.has(g.a.id)) moved.add(j); });
   for (const j of moved) { const g = good[j], a = g.a, link = g.link, b = boxes[link.to], fromArrayCell = a.kind === 'array' && !link.port, m = basePath(link, boxes)!.match(/^M\s+(-?[\d.]+)\s+(-?[\d.]+)/)!;
     bad.push({ link, a, b, start: fromArrayCell ? { x: a.x + cellCentre(link.cell ?? 0), y: a.y + a.h + 20 } : { x: a.x + Number(m[1]), y: a.y + Number(m[2]) }, base: '' }); }
-  if (!bad.length) return { maxX: 0, needs };
+  if (!bad.length) return { maxX: 0, maxY, needs };
   // Gutter columns: arrows going up are ordered so the one reaching highest sits outermost; arrows going down so the lowest does.
   const ty = (r: { b: Box }) => r.b.y + r.b.h / 2, up = (r: { a: Box; b: Box }) => r.b.y + r.b.h / 2 < r.a.y + r.a.h / 2;
   const ordered = [...bad.filter(up).sort((p, q) => ty(q) - ty(p) || p.start.x - q.start.x), ...bad.filter((r) => !up(r)).sort((p, q) => ty(p) - ty(q) || q.start.x - p.start.x)];
@@ -818,9 +852,10 @@ function routeLinksCompute(links: Link[], boxes: Record<string, Box>, sceneW: nu
       pts.splice(0, pts.length, ...(best ?? [...pts, { x: gx, y: r.b.y - 8 - rk * 7 }, { x: ex, y: r.b.y - 8 - rk * 7 }, { x: ex, y: r.b.y - 3 }]));
     }
     routeOf.set(r.link, rounded(pts, r.a));
+    note(pts);
     maxX = Math.max(maxX, gx);
   });
-  return { maxX: maxX + 28, needs };
+  return { maxX: maxX + 28, maxY, needs };
 }
 // Resample a polyline to roughly 6px steps.
 function densify(pts: Pt[]): Pt[] {
