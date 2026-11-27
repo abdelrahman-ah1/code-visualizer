@@ -81,6 +81,7 @@ footer { color:var(--muted); font-size:11px; border-top:1px solid var(--line); m
 .node-main,.cell-value { fill:var(--ink); font:600 15px 'SFMono-Regular',Consolas,monospace; }
 .node-rest { fill:var(--muted); font:10px 'SFMono-Regular',Consolas,monospace; }
 .node-id,.cell-index { fill:var(--muted); font:10px 'SFMono-Regular',Consolas,monospace; }
+.sq-mark { fill:var(--accent); font:600 10px 'SFMono-Regular',Consolas,monospace; }
 .adj-caption { fill:var(--muted); font:600 12px 'SFMono-Regular',Consolas,monospace; }
 .vertex-circle { stroke-width:2; }
 .node-null { fill:var(--muted); font-size:16px; }
