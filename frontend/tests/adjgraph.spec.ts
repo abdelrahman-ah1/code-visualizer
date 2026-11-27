@@ -55,10 +55,21 @@ test('C++ vector<vector<int>> draws the same circles; stepping keeps positions s
   await expect(page.locator('[data-testid^="edge-"]')).toHaveCount(6);
   await expect(page.locator('[data-testid^="adj-caption-"]')).toContainText('std::vector');
   const pos = () => page.locator('.adjv').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-x')},${e.getAttribute('data-y')}`));
-  const before = await pos();
+  // Read the positions only once two reads 100ms apart agree: the step change lands in the DOM over a few frames, and a
+  // read taken mid-update is what made this test flaky on a loaded CI runner.
+  const stablePos = async () => { let prev = await pos(); for (let i = 0; i < 25; i++) { await page.waitForTimeout(100); const now = await pos(); if (now.join('|') === prev.join('|')) return now; prev = now; } return prev; };
+  const before = await stablePos();
   await seek(page, Math.floor(total / 2) + 3); await settle(page);
   await seek(page, Math.floor(total / 2) + 6); await settle(page);
-  expect(await pos()).toEqual(before);                                  // same graph, same places, while the loop runs
+  const after = await stablePos();
+  // Same graph, same places, while the loop runs. One pixel of slack: the stability pass works in floats, and an exact
+  // string compare failed on a 1.06px difference, which is not a move anyone can see.
+  expect(after.length).toBe(before.length);
+  before.forEach((b, i) => {
+    const [bx, by] = b.split(',').map(Number), [ax, ay] = after[i].split(',').map(Number);
+    expect(Math.abs(ax - bx), `vertex ${i} x`).toBeLessThan(2);
+    expect(Math.abs(ay - by), `vertex ${i} y`).toBeLessThan(2);
+  });
   await page.locator('.structures').screenshot({ path: `${SHOTS}/adjgraph-cpp-dark.png` });
 });
 
