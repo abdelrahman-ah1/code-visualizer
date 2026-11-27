@@ -215,6 +215,7 @@ def printer_for(val):
 
 LIB_MAPS = {"std::map", "std::unordered_map", "std::multimap"}
 LIB_SEQS = {"std::set", "std::multiset", "std::unordered_set", "std::list", "std::deque", "std::forward_list"}
+LIB_ADAPTERS = {"std::queue", "std::stack", "std::priority_queue"}   # container adaptors: captured through their underlying container `c`
 KNOWN_TYPES = {}   # allocation serial -> gdb type last seen through a typed pointer
 
 
@@ -579,6 +580,42 @@ class Encoder:
                     node["fields"] = {"get()": {"kind": "scalar", "type": "pointer", "value": None}}
                 return
             base_name = tname.split("<", 1)[0]
+            if base_name in LIB_ADAPTERS:
+                # std::queue/stack/priority_queue hold no elements themselves: read the underlying container `c`
+                # (a std::deque or std::vector) through its library printer, exactly like a directly captured one.
+                # std::queue items run front to back, std::stack bottom to top; std::priority_queue keeps heap order
+                # (documented in TRACE_FORMAT.md), which is its real storage order, not sorted order.
+                try:
+                    inner = val["c"]
+                except (gdb.error, RuntimeError):
+                    inner = None
+                if inner is None or printer_for(inner) is None:
+                    self.own(val)
+                    node["opaque"] = True
+                    return
+                iname = pretty(str(inner.type.strip_typedefs().unqualified())).split("<", 1)[0]
+                if self.buffer_released(inner, iname):
+                    node["opaque"], node["type"] = True, tname + " (buffer released)"
+                    return
+                self.own(val)
+                self.own(inner)
+                kids = []
+                for i, (_, child) in enumerate(printer_for(inner).children()):
+                    if i >= MAX_ITEMS:
+                        node["truncated"] = True
+                        self.truncated.append("items")
+                        break
+                    kids.append(child)
+                node["type"], node["element_type"] = base_name, first_template_arg(tname[len(base_name) + 1:-1])
+                node["items"] = [self.value(c, depth) for c in kids]
+                node["length"] = len(kids) if not node.get("truncated") else len(kids) + 1
+                if iname == "std::vector" and self.vector_uninitialised(inner, node["items"]):
+                    # On the declaration line the adaptor's bytes are stale: an empty container is the honest picture.
+                    node["items"], node["length"] = [], 0
+                    node.pop("truncated", None)
+                    if "items" in self.truncated:
+                        self.truncated.remove("items")
+                return
             if base_name in LIB_MAPS | LIB_SEQS and printer_for(val) is not None:
                 if self.buffer_released(val, base_name):
                     node["opaque"], node["type"] = True, tname + " (buffer released)"
