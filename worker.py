@@ -3,6 +3,8 @@ import errno
 import io
 import json
 import math
+import collections
+from itertools import islice
 from pathlib import Path
 import sys
 import types
@@ -93,6 +95,13 @@ class Encoder:
             heap[ref] = node  # Register before recursion, so cycles terminate.
             if t in (list, tuple):
                 node["items"] = [encode(x, depth + 1) for x in value[:40]]
+                node["length"] = len(value)
+                if len(value) > 40:
+                    truncated.append("items")
+                    node["truncated"] = True
+            elif t is collections.deque:
+                # Front-to-back order, like list. The exact built-in only: a deque subclass keeps the fields/opaque path.
+                node["items"] = [encode(x, depth + 1) for x in islice(value, 40)]
                 node["length"] = len(value)
                 if len(value) > 40:
                     truncated.append("items")
