@@ -10,7 +10,7 @@ export const GEOM = { nodeW: 124, nodeH: 56, gap: 52, cell: 46, pad: 28, tagH: 3
 export const LANE_H = GEOM.tagH + GEOM.nodeH + GEOM.belowH;
 const POCKET = 15; // distance from a node's right edge to the centre of its link dot
 
-export interface Box { id: string; kind: 'node' | 'array' | 'card'; x: number; y: number; w: number; h: number; lane: number; mainH?: number; rec?: boolean; vertex?: boolean }
+export interface Box { id: string; kind: 'node' | 'array' | 'card'; x: number; y: number; w: number; h: number; lane: number; mainH?: number; rec?: boolean; vertex?: boolean; circle?: boolean }   // circle: an adjacency-graph vertex, drawn as a circle labelled by index
 // An arrow from one box (and, for arrays, one cell) to another drawn box.
 export interface Link { from: string; cell?: number; to: string; port?: { x: number; y: number };
   // M6 graph edges: a finished path (in the source box's coordinates), whether the line has a head at both ends
@@ -71,6 +71,7 @@ export interface Scene {
   tags: Record<string, string[]>;   // heap id -> variable names pointing at it
   nulls: string[];                  // variables currently null
   graph?: GraphSpec;
+  adjGroups?: AdjGroup[];           // adjacency-list graphs drawn as circles (vertices are synthetic ids, not heap objects)
   cards: string[];                  // ids drawn as general object cards
   undrawn: { id: string; type: string }[]; // heap objects this view does not draw (see the Heap panel)
   width: number; height: number;
@@ -100,10 +101,11 @@ export function linkFieldsByType(heap: Record<string, HeapNode>): Map<string, st
 }
 
 export interface LayoutState { laneOf: Map<string, number>; headOf: Map<number, string>; rank: Map<string, number>;
-  tx: Map<string, number>; gx: Map<string, number>; tOrigin?: number; gOrigin?: number;
-  graphTypes?: Map<string, string[]> }   // types that are neighbour-list graph vertices at some point in this trace (type -> list fields), so they are drawn as vertices from the first event   // M6: remembered tree and graph x positions (slot units) by object id
+  tx: Map<string, number>; gx: Map<string, number>; tOrigin?: number; gOrigin?: number; gaOrigin?: number;
+  graphTypes?: Map<string, string[]>;   // types that are neighbour-list graph vertices at some point in this trace (type -> list fields), so they are drawn as vertices from the first event   // M6: remembered tree and graph x positions (slot units) by object id
+  adjOf?: Map<string, 0 | 1> }          // array ids that are adjacency lists at some point in this trace, with their index base, so they are drawn as graphs from the first event
 export const newLayoutState = (): LayoutState => ({ laneOf: new Map(), headOf: new Map(), rank: new Map(), tx: new Map(), gx: new Map() });
-export const cloneLayoutState = (st: LayoutState): LayoutState => ({ laneOf: new Map(st.laneOf), headOf: new Map(st.headOf), rank: new Map(st.rank), tx: new Map(st.tx), gx: new Map(st.gx), tOrigin: st.tOrigin, gOrigin: st.gOrigin, graphTypes: st.graphTypes });
+export const cloneLayoutState = (st: LayoutState): LayoutState => ({ laneOf: new Map(st.laneOf), headOf: new Map(st.headOf), rank: new Map(st.rank), tx: new Map(st.tx), gx: new Map(st.gx), tOrigin: st.tOrigin, gOrigin: st.gOrigin, gaOrigin: st.gaOrigin, graphTypes: st.graphTypes, adjOf: st.adjOf });
 
 interface Structure { kind: 'list' | 'array'; ids: string[]; type: string; end?: SceneLane['end']; endTo?: string }
 
@@ -111,6 +113,65 @@ export const arrayOmitted = (n: HeapNode) => {
   const shown = n.items?.length ?? 0;
   return Math.max(0, (n.length ?? shown) - shown, n.truncated && (n.length ?? 0) <= shown ? 1 : 0);
 };
+
+
+// ---- Adjacency-list graphs (index-based) -----------------------------------------------------------------------------
+// An array whose items are all arrays of ints, every int a valid index into the outer array, is a graph: circles labelled
+// by index, arrows from the inner lists. The outer array and its inner lists leave the diagram (they stay in the Heap panel).
+// Strict rules, plain list view on ANY doubt: a uniform numeric rectangle is a matrix, not a graph; a row shared with another
+// variable or cut off by the recording limits disqualifies the whole candidate. 1-based only when 0 appears nowhere and the
+// largest value equals n exactly. Caps keep huge graphs in the list view. No tracer or trace-format change: list[list[int]]
+// and vector<vector<int>> already record as arrays of arrays.
+const INT_TYPE = /^(int|unsigned|unsigned int|long|long long|unsigned long|unsigned long long|short|unsigned short|size_t|u?int(8|16|32|64)(_t)?)$/;
+export const isIntScalar = (v: Value) => v.kind === 'scalar' && typeof v.value === 'number' && Number.isInteger(v.value) && INT_TYPE.test(v.type);
+export const ADJ_LIMITS = { vertices: 60, edges: 300 };
+export interface AdjSpec { outer: string; base: 0 | 1; n: number; lists: string[]; rows: number[][] }   // rows: raw index values per vertex
+export interface AdjGroup { outer: string; label: string; vertices: string[] }   // label: variable names + recorded type, for the group caption
+
+export function adjacencySpec(event: TraceEvent, known?: Map<string, 0 | 1>): AdjSpec[] {
+  const heap = event.heap, out: AdjSpec[] = [];
+  const refs = new Map<string, number>();
+  const bump = (v: Value) => { if (v.kind === 'ref') refs.set(v.id, (refs.get(v.id) ?? 0) + 1); };
+  for (const n of Object.values(heap)) { Object.values(n.fields ?? {}).forEach(bump); (n.items ?? []).forEach(bump); (n.entries ?? []).forEach(([k, v]) => { bump(k); bump(v); }); }
+  for (const f of event.frames) for (const v of Object.values(f.locals)) bump(v);
+  for (const id of Object.keys(heap)) {
+    const n = heap[id];
+    if (!isArray(n) || !n.items || arrayOmitted(n) > 0) continue;      // cut-off rows: cannot verify every row
+    const cnt = n.items.length;
+    if (cnt < 2 || cnt > ADJ_LIMITS.vertices) continue;
+    if (!n.items.every((r) => r.kind === 'ref' && r.id !== id)) continue;
+    const lists = n.items.map((r) => (r as { kind: 'ref'; id: string }).id);
+    if (new Set(lists).size !== lists.length) continue;                // the same row twice: aliasing we will not hide
+    if (lists.some((l) => (refs.get(l) ?? 0) !== 1)) continue;         // a row is shared: it stays visible, like M6
+    const inners = lists.map((l) => heap[l]);
+    if (inners.some((a) => !a || !isArray(a) || !a.items || arrayOmitted(a) > 0)) continue;
+    const lens = inners.map((a) => a.items!.length);
+    if (lens.every((l) => l === lens[0]) && lens[0] > 1) continue;     // uniform rectangle 2+ wide: a matrix, not a graph (one index per row is a graph)
+    if (inners.some((a) => !a.items!.every(isIntScalar))) continue;    // rows of anything but plain ints
+    const rows = inners.map((a) => a.items!.map((v) => (v as { value: number }).value));
+    const vals = rows.flat(), edgeCount = vals.length;
+    if (edgeCount > ADJ_LIMITS.edges) continue;
+    const kb = known?.get(id);
+    let base: 0 | 1;
+    if (kb !== undefined) {                                            // known from the trace scan: valid unless the values no longer fit its base
+      if (!vals.every((v) => (kb === 0 ? v >= 0 && v < cnt : v >= 1 && v <= cnt))) continue;
+      base = kb;
+    } else if (vals.length === 0) continue;                            // all rows empty and never seen as a graph: nothing to detect from
+    else if (vals.every((v) => v >= 0 && v < cnt)) base = 0;
+    else if (vals.every((v) => v >= 1 && v <= cnt) && Math.max(...vals) === cnt) base = 1;
+    else continue;
+    out.push({ outer: id, base, n: cnt, lists, rows });
+  }
+  return out;
+}
+
+// Array ids that are adjacency lists in at least one event of the trace, with their base. Scanned once per trace (like
+// graphTypesOf), so an adjacency list is drawn as a graph from the first event, while its rows are still empty.
+export function adjacencyOf(trace: Trace): Map<string, 0 | 1> {
+  const out = new Map<string, 0 | 1>();
+  for (const e of trace.events) for (const s of adjacencySpec(e, out)) if (!out.has(s.outer)) out.set(s.outer, s.base);
+  return out;
+}
 
 // ---- M6 graph mode -------------------------------------------------------------------------------------------------
 // A type is drawn as graph vertices when one of its fields holds a neighbour list: a list/array that only this one field
@@ -208,12 +269,34 @@ export function edgePath(a: Box, b: Box, boxes: Box[], both: boolean): { d: stri
   return { d: `M ${local(s0)} L ${local(e0)}`, mid: { x: (s0.x + e0.x) / 2 - a.x, y: (s0.y + e0.y) / 2 - a.y } };
 }
 
+// One line per pair of vertices. Two vertices that point at each other share one line with a head at both ends; a line
+// with one head is a one-way edge. A vertex that points at itself gets a small loop out of its right side.
+function graphLinksFor(vids: string[], edges: Map<string, string[]>, count: Map<string, number>, rank: (id: string) => number, boxes: Record<string, Box>): Link[] {
+  const links: Link[] = [], allBoxes = Object.values(boxes), done = new Set<string>();
+  for (const a of vids) for (const t of edges.get(a)!) {
+    const key = [a, t].sort().join('|'); if (done.has(key)) continue; done.add(key);
+    const rev = edges.get(t)!.includes(a), ab = count.get(`${a}|${t}`) ?? 0, ba = count.get(`${t}|${a}`) ?? 0;
+    const [from, to] = rank(a) <= rank(t) || !rev ? [a, t] : [t, a], both = rev;
+    const { d, mid } = edgePath(boxes[from], boxes[to], allBoxes, both);
+    const label = both ? (ab > 1 || ba > 1 ? `×${from === a ? ab : ba} ×${from === a ? ba : ab}` : undefined) : (ab > 1 ? `×${ab}` : undefined);
+    links.push({ from, to, d, both, label, mid });
+  }
+  for (const v of vids) if (count.get(`${v}|${v}`)) {
+    const b = boxes[v];
+    links.push({ from: v, to: v, d: `M ${b.w + 1} ${b.h * 0.3} C ${b.w + 40} ${b.h * 0.3 - 14}, ${b.w + 40} ${b.h * 0.7 + 14}, ${b.w + 3} ${b.h * 0.7}`, label: count.get(`${v}|${v}`)! > 1 ? `×${count.get(`${v}|${v}`)}` : undefined, mid: { x: b.w + 26, y: b.h * 0.5 + 4 } });
+  }
+  return links;
+}
+
 export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<number, number>, route = true): Scene {
   const heap = event.heap, ids = Object.keys(heap);
   // First-seen order keeps lane choice deterministic. IDs are encounter order, but we do not rely on that.
   for (const id of ids) if (!state.rank.has(id)) state.rank.set(id, state.rank.size);
   const rank = (id: string) => state.rank.get(id) ?? 0;
   const gs = graphSpec(event, state.graphTypes), vertexSet = new Set(gs.vertices);
+  const adjSpecs = adjacencySpec(event, state.adjOf), adjHidden = new Set(adjSpecs.flatMap((a) => [a.outer, ...a.lists]));
+  const adjNameOf = new Map(adjSpecs.map((a) => [a.outer, [] as string[]]));
+  for (const f of event.frames) for (const [name, v] of Object.entries(f.locals)) if (v.kind === 'ref' && adjNameOf.has(v.id)) adjNameOf.get(v.id)!.push(f.depth === 0 ? name : `${f.function}:${name}`);
   const linkField = linkFieldsByType(heap);
   const field = (id: string) => linkField.get(heap[id].type);
   const listNodes = ids.filter((id) => { const f = field(id); return !vertexSet.has(id) && !!f && !!heap[id].fields && Object.hasOwn(heap[id].fields!, f); });
@@ -240,7 +323,7 @@ export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<nu
   // Heads first (nothing points at them), then anything left over is a pure cycle.
   for (const id of listNodes.filter((n) => indeg.get(n) === 0).sort((a, b) => rank(a) - rank(b))) walk(id);
   for (const id of listNodes.slice().sort((a, b) => rank(a) - rank(b))) if (!seen.has(id)) walk(id);
-  for (const id of ids) if (isArray(heap[id]) && !gs.collapsed.has(id)) structures.push({ kind: 'array', ids: [id], type: heap[id].type });
+  for (const id of ids) if (isArray(heap[id]) && !gs.collapsed.has(id) && !adjHidden.has(id)) structures.push({ kind: 'array', ids: [id], type: heap[id].type });
   // Arrays that hold pointers sit lowest, next to the objects they point at, so their arrows do not run across other arrays.
   // (An array whose pointers all lead to other arrays stays above them, so those arrows run downward.)
   const ptrMemo = new Map<Structure, number>();
@@ -290,7 +373,7 @@ export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<nu
   });
 
   const lanesH = Math.max(LANE_H, rowH.reduce((a, b) => a + b, 0)) + 12;
-  const cardIds = ids.filter((id) => !boxes[id] && !vertexSet.has(id) && !gs.collapsed.has(id)).sort((a, b) => rank(a) - rank(b));
+  const cardIds = ids.filter((id) => !boxes[id] && !vertexSet.has(id) && !gs.collapsed.has(id) && !adjHidden.has(id)).sort((a, b) => rank(a) - rank(b));
   const wrapW = Math.max(width, 1000);
   // With a tree, plain object cards (like the table that owns the arrays) go in a band just above the arrays that hold pointers,
   // so their arrows drop onto the array without crossing the arrows that leave it. Arrays without pointers stay above the band.
@@ -371,21 +454,34 @@ export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<nu
     for (const v of vids) { const q = fresh.get(v)!; depth = Math.max(depth, q.d); boxes[v] = { id: v, kind: 'card', x: GEOM.pad + (sx.get(v)! - origin) * slot, y: y0 + q.d * rowTall, w: VERTEX.w, h: hOf.get(v)!, lane: -1, vertex: true }; }
     width = Math.max(width, GEOM.pad + (Math.max(...sx.values()) - origin) * slot + VERTEX.w + GEOM.pad);
     totalH = Math.max(totalH, y0 + depth * rowTall + maxH + GEOM.belowH / 2);
-    // One line per pair of vertices. Two vertices that point at each other share one line with a head at both ends; a line with one head is a one-way edge.
-    const allBoxes = Object.values(boxes), done = new Set<string>();
-    for (const a of vids) for (const t of edges.get(a)!) {
-      const key = [a, t].sort().join('|'); if (done.has(key)) continue; done.add(key);
-      const rev = edges.get(t)!.includes(a), ab = count.get(`${a}|${t}`) ?? 0, ba = count.get(`${t}|${a}`) ?? 0;
-      const [from, to] = rank(a) <= rank(t) || !rev ? [a, t] : [t, a], both = rev;
-      const { d, mid } = edgePath(boxes[from], boxes[to], allBoxes, both);
-      const label = both ? (ab > 1 || ba > 1 ? `×${from === a ? ab : ba} ×${from === a ? ba : ab}` : undefined) : (ab > 1 ? `×${ab}` : undefined);
-      graphLinks.push({ from, to, d, both, label, mid });
-    }
-    for (const v of vids) if (count.get(`${v}|${v}`)) {   // a vertex that points at itself: a small loop out of its right side
-      const b = boxes[v];
-      graphLinks.push({ from: v, to: v, d: `M ${b.w + 1} ${b.h * 0.3} C ${b.w + 40} ${b.h * 0.3 - 14}, ${b.w + 40} ${b.h * 0.7 + 14}, ${b.w + 3} ${b.h * 0.7}`, label: count.get(`${v}|${v}`)! > 1 ? `×${count.get(`${v}|${v}`)}` : undefined, mid: { x: b.w + 26, y: b.h * 0.5 + 4 } });
-    }
+    graphLinks.push(...graphLinksFor(vids, edges, count, rank, boxes));
   }
+  // Adjacency-list graphs: circles labelled by index, arrows from the inner lists. Same layout machinery as M6 graph mode,
+  // positions remembered by synthetic vertex id (outer#label), so a vertex keeps its place across steps.
+  const CIRCLE = 56;
+  if (adjSpecs.length) {
+    const y0 = (occupied.length || flatIds.length || treeIds.length || gs.vertices.length ? totalH + 10 : 0) + GEOM.tagH;
+    let gx0 = y0;
+    for (const spec of adjSpecs) {
+      const vids = spec.lists.map((_, i) => `${spec.outer}#${i + spec.base}`), vset = new Set(vids), ord = new Map(vids.map((v, i) => [v, i]));
+      const edges = new Map<string, string[]>(), count = new Map<string, number>();
+      spec.rows.forEach((cols, r) => {
+        const a = vids[r], targets = cols.map((c) => `${spec.outer}#${c}`).filter((t) => vset.has(t));
+        for (const t of targets) count.set(`${a}|${t}`, (count.get(`${a}|${t}`) ?? 0) + 1);
+        edges.set(a, [...new Set(targets)].filter((t) => t !== a));
+      });
+      const fresh = layeredLayout({ ids: vids, out: edges });
+      const sx = stabilize(fresh, state.gx), lo = Math.min(...sx.values());
+      let origin = state.gaOrigin ?? lo; if (lo < origin || lo - origin > 2) origin = lo; state.gaOrigin = origin;
+      const slot = CIRCLE + VERTEX.gapX, rowTall = CIRCLE + VERTEX.gapY;
+      let depth = 0;
+      for (const v of vids) { const q = fresh.get(v)!; depth = Math.max(depth, q.d); boxes[v] = { id: v, kind: 'card', x: GEOM.pad + (sx.get(v)! - origin) * slot, y: gx0 + q.d * rowTall, w: CIRCLE, h: CIRCLE, lane: -1, vertex: true, circle: true }; }
+      width = Math.max(width, GEOM.pad + (Math.max(...sx.values()) - origin) * slot + CIRCLE + GEOM.pad);
+      totalH = Math.max(totalH, gx0 + depth * rowTall + CIRCLE + GEOM.belowH / 2);
+      gx0 = totalH + 10;   // a second adjacency list draws below the first
+      graphLinks.push(...graphLinksFor(vids, edges, count, (id) => ord.get(id) ?? 0, boxes));
+    }
+  } else state.gaOrigin = undefined;
   const links: Link[] = [];
   // Pointer fields on list nodes other than the chain link (prev, parent, owner ...).
   for (const id of listNodes) {
@@ -415,7 +511,8 @@ export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<nu
   if (!extra && routed.needs.size) return buildScene(event, state, routed.needs);   // lay out again with room for the channels
   width = Math.max(width, routed.maxX);
   const undrawn: { id: string; type: string }[] = []; // every captured object now has a box
-  return { lanes, boxes, links: graphLinks.length ? [...links, ...graphLinks] : links, tags, nulls, cards: [...cardIds, ...gs.vertices], graph: gs, undrawn, width, height: totalH + 40 };   // room for same-row arrows that drop under the row
+  const adjGroups: AdjGroup[] = adjSpecs.map((a) => ({ outer: a.outer, label: `${(adjNameOf.get(a.outer) ?? []).join(', ') || a.outer} (${heap[a.outer].type})`, vertices: a.lists.map((_, i) => `${a.outer}#${i + a.base}`) }));
+  return { lanes, boxes, links: graphLinks.length ? [...links, ...graphLinks] : links, tags, nulls, cards: [...cardIds, ...gs.vertices], graph: gs, adjGroups, undrawn, width, height: totalH + 40 };   // room for same-row arrows that drop under the row
 }
 
 // All scenes for a trace, built once in order so lane choices carry forward. Stepping backward just indexes this array.
@@ -426,7 +523,7 @@ export function graphTypesOf(trace: Trace): Map<string, string[]> {
   return out;
 }
 export function buildScenes(trace: Trace): Scene[] {
-  const state = newLayoutState(); state.graphTypes = graphTypesOf(trace);
+  const state = newLayoutState(); state.graphTypes = graphTypesOf(trace); state.adjOf = adjacencyOf(trace);
   return trace.events.map((e) => buildScene(e, state));
 }
 
@@ -438,7 +535,7 @@ export function sceneCache(trace: Trace): SceneCache {
   const state = newLayoutState(), scenes: Scene[] = [], snaps: LayoutState[] = [], shown = new Map<number, Scene>();
   const clone = cloneLayoutState;
   // Scenes are laid out in order so lane choices carry forward, but arrow routing (the costly part) is done only for a scene that is asked for, from the lane state just before it.
-  const upTo = (i: number) => { while (scenes.length <= i && scenes.length < trace.events.length) { state.graphTypes ??= graphTypesOf(trace); snaps.push(clone(state)); scenes.push(buildScene(trace.events[scenes.length], state, undefined, false)); } };
+  const upTo = (i: number) => { while (scenes.length <= i && scenes.length < trace.events.length) { state.graphTypes ??= graphTypesOf(trace); state.adjOf ??= adjacencyOf(trace); snaps.push(clone(state)); scenes.push(buildScene(trace.events[scenes.length], state, undefined, false)); } };
   return {
     get(i) {
       upTo(i);
