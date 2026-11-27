@@ -10,7 +10,7 @@ export const GEOM = { nodeW: 124, nodeH: 56, gap: 52, cell: 46, pad: 28, tagH: 3
 export const LANE_H = GEOM.tagH + GEOM.nodeH + GEOM.belowH;
 const POCKET = 15; // distance from a node's right edge to the centre of its link dot
 
-export interface Box { id: string; kind: 'node' | 'array' | 'card'; x: number; y: number; w: number; h: number; lane: number; mainH?: number; rec?: boolean; vertex?: boolean; circle?: boolean }   // circle: an adjacency-graph vertex, drawn as a circle labelled by index
+export interface Box { id: string; kind: 'node' | 'array' | 'card'; x: number; y: number; w: number; h: number; lane: number; mainH?: number; rec?: boolean; vertex?: boolean; circle?: boolean; stack?: boolean; queue?: boolean }   // circle: an adjacency-graph vertex, drawn as a circle labelled by index; stack/queue: cell strip drawn as a vertical stack / marked queue
 // An arrow from one box (and, for arrays, one cell) to another drawn box.
 export interface Link { from: string; cell?: number; to: string; port?: { x: number; y: number };
   // M6 graph edges: a finished path (in the source box's coordinates), whether the line has a head at both ends
@@ -77,7 +77,11 @@ export interface Scene {
   width: number; height: number;
 }
 
-export const ARRAY_TYPES = ['list', 'tuple', 'array', 'std::vector']; // M5 adds the two C++ kinds
+export const ARRAY_TYPES = ['list', 'tuple', 'array', 'std::vector', 'deque', 'std::queue', 'std::stack', 'std::priority_queue']; // M5 adds the two C++ kinds; M6 adds the queue/stack families
+// Queue and stack are decided by exact type name only (rule A: the tracer named it, believe the name). Anything else with
+// items keeps the plain strip; std::priority_queue has items in heap order, so it stays a plain strip on purpose.
+export const QUEUE_TYPES = ['deque', 'std::queue'];
+export const STACK_TYPES = ['std::stack'];
 const isArray = (n: HeapNode) => !!n.items && ARRAY_TYPES.includes(n.type);
 const sameTypeRef = (heap: Record<string, HeapNode>, from: HeapNode, v: Value | undefined): string | null =>
   v && v.kind === 'ref' && heap[v.id]?.fields && heap[v.id].type === from.type ? v.id : null;
@@ -231,7 +235,7 @@ export function vertexEdges(heap: Record<string, HeapNode>, id: string, spec: Gr
 // Returns null when that curve would cross another box, so the caller keeps the obstacle router's path for it instead.
 export function pointerToVertex(link: Link, boxes: Record<string, Box>): string | null {
   const a = boxes[link.from], b = boxes[link.to]; if (!a || !b) return null;
-  const s: Pt = link.port ? { x: a.x + link.port.x, y: a.y + link.port.y } : a.kind === 'array' ? { x: a.x + cellCentre(link.cell ?? 0), y: a.y + a.h } : { x: a.x + a.w - POCKET, y: a.y + a.h };
+  const s: Pt = link.port ? { x: a.x + link.port.x, y: a.y + link.port.y } : a.kind === 'array' ? { x: a.x + cellAnchor(a, link.cell ?? 0).x, y: a.y + cellAnchor(a, link.cell ?? 0).y } : { x: a.x + a.w - POCKET, y: a.y + a.h };
   const e: Pt = { x: b.x + b.w / 2 + 16, y: b.y - 3 }, side = !!link.port && s.x >= a.x + a.w - 14 ? 40 : 0;
   const c1 = { x: s.x + side, y: s.y + (side ? 0 : 40) }, c2 = { x: e.x, y: e.y - 45 };
   const pts = [...Array(33)].map((_, i) => { const t = i / 32, u = 1 - t; return { x: u * u * u * s.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * e.x, y: u * u * u * s.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * e.y }; });
@@ -355,6 +359,13 @@ export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<nu
     const r = rowOf.get(laneFor[i])!;
     rowH[r] = Math.max(rowH[r], GEOM.tagH + Math.max(...st.ids.map((id) => geomOf.get(id)!.h)) + GEOM.belowH);
   });
+  // A stack is a vertical column of cells: its row must be tall enough for every cell plus the labels.
+  structures.forEach((st, i) => {
+    if (st.kind !== 'array' || !STACK_TYPES.includes(heap[st.ids[0]].type)) return;
+    const node = heap[st.ids[0]], cells = Math.max(1, (node.items?.length ?? 0) + (arrayOmitted(node) > 0 ? 1 : 0));
+    const r = rowOf.get(laneFor[i])!;
+    rowH[r] = Math.max(rowH[r], GEOM.tagH + cells * GEOM.cell + GEOM.belowH);
+  });
   // Second pass only: rows whose re-routed arrows need a wider channel under them grow by that much.
   if (extra) for (const [lane, e] of extra) { const r = rowOf.get(lane); if (r !== undefined) rowH[r] += e; }
   const rowTop: number[] = []; rowH.reduce((acc, h, r) => { rowTop[r] = acc; return acc + h; }, 0);
@@ -366,9 +377,10 @@ export function buildScene(event: TraceEvent, state: LayoutState, extra?: Map<nu
       s.ids.forEach((id) => { const g = geomOf.get(id)!; boxes[id] = { id, kind: 'node', x, y, w: g.w, h: g.h, mainH: g.mainH, lane }; x += g.w + GEOM.gap; });
       width = Math.max(width, x - GEOM.gap + GEOM.pad + GEOM.gap);
     } else {
-      const node = heap[s.ids[0]], cells = (node.items?.length ?? 0) + (arrayOmitted(node) > 0 ? 1 : 0);
-      boxes[s.ids[0]] = { id: s.ids[0], kind: 'array', x: GEOM.pad, y, w: Math.max(1, cells) * GEOM.cell, h: GEOM.cell, lane };
-      width = Math.max(width, GEOM.pad * 2 + Math.max(1, cells) * GEOM.cell);
+      const node = heap[s.ids[0]], cells = Math.max(1, (node.items?.length ?? 0) + (arrayOmitted(node) > 0 ? 1 : 0));
+      const stack = STACK_TYPES.includes(node.type), queue = QUEUE_TYPES.includes(node.type);
+      boxes[s.ids[0]] = { id: s.ids[0], kind: 'array', x: GEOM.pad, y, w: stack ? GEOM.cell : cells * GEOM.cell, h: stack ? cells * GEOM.cell : GEOM.cell, lane, ...(stack ? { stack: true } : {}), ...(queue ? { queue: true } : {}) };
+      width = Math.max(width, GEOM.pad * 2 + (stack ? GEOM.cell : cells * GEOM.cell));
     }
   });
 
@@ -571,6 +583,10 @@ export function nodeDisplay(node: HeapNode, linkField: string | undefined) {
 
 // Cell index in an array box to the x centre of that cell.
 export const cellCentre = (cell: number) => cell * GEOM.cell + GEOM.cell / 2;
+// Where an arrow leaves a cell strip for one cell, in box coordinates. A stack is a vertical column
+// (cell 0 at the bottom), so its arrows leave from the right edge at that cell's height.
+const cellAnchor = (b: { w: number; h: number; stack?: boolean }, cell: number, below = 0): { x: number; y: number } =>
+  b.stack ? { x: b.w, y: b.h - cell * GEOM.cell - GEOM.cell / 2 } : { x: cellCentre(cell), y: b.h + below };
 
 // SVG path for one arrow, in the coordinate space of its source box (so the arrow travels with its source).
 export function linkPath(link: Link, boxes: Record<string, Box>): string | null {
@@ -584,7 +600,7 @@ function basePath(link: Link, boxes: Record<string, Box>): string | null {
   if (!a || !b) return null;
   if (a.kind === 'card' || b.kind === 'card' || link.port) {
     const dx = b.x - a.x, dy = b.y - a.y;
-    const sx = link.port ? link.port.x : a.kind === 'array' ? cellCentre(link.cell ?? 0) + 14 : a.w - POCKET, sy = link.port ? link.port.y : a.kind === 'array' ? a.h : a.h;
+    const sx = link.port ? link.port.x : a.kind === 'array' ? cellAnchor(a, link.cell ?? 0).x + (a.stack ? 0 : 14) : a.w - POCKET, sy = link.port ? link.port.y : cellAnchor(a, link.cell ?? 0).y;
     if (link.from === link.to) return `M ${sx} ${sy} C ${sx + 40} ${sy - 10}, ${sx + 40} ${sy + 20}, ${sx + 2} ${sy + 4}`;
     const tx = a.kind === 'card' && a.rec && b.rec && dy > a.h ? dx + b.w - 16 : dx + b.w / 2, ty = dy - 3;
     const right = (a.kind === 'card' || a.kind === 'node') && link.port && dx > a.w; // target is clear of the card on the right: go side to side
@@ -599,7 +615,7 @@ function basePath(link: Link, boxes: Record<string, Box>): string | null {
     return `M ${sx} ${sy} C ${sx + 50} ${sy + 20}, ${tx} ${ty - 60}, ${tx} ${ty}`;
   }
   const dx = b.x - a.x, dy = b.y - a.y;
-  const start = a.kind === 'node' ? { x: a.w - POCKET, y: (a.mainH ?? a.h) / 2 + 4 } : { x: cellCentre(link.cell ?? 0), y: a.h + 20 };
+  const start = a.kind === 'node' ? { x: a.w - POCKET, y: (a.mainH ?? a.h) / 2 + 4 } : cellAnchor(a, link.cell ?? 0, 20);
   // Straight arrow: next node sits directly to the right in the same row.
   if (a.kind === 'node' && b.kind === 'node' && dy === 0 && dx === a.w + GEOM.gap) return `M ${start.x} ${start.y} L ${dx - 2} ${start.y}`;
   const below = a.kind === 'node' ? { x: a.w - POCKET, y: a.h } : start;
@@ -632,7 +648,10 @@ export function laneSummary(lane: SceneLane, event: TraceEvent, scene: Scene): s
   const heap = event.heap, tag = (id: string) => (scene.tags[id]?.length ? ` (${scene.tags[id].join(', ')})` : '');
   if (lane.kind === 'array') {
     const n = heap[lane.ids[0]], om = arrayOmitted(n);
-    return `${n.type} ${lane.ids[0]}${tag(lane.ids[0])}: [${(n.items ?? []).map((v) => fmt(v, 12)).join(', ')}${om ? `, … ${om} more omitted` : ''}]`;
+    const body = `[${(n.items ?? []).map((v) => fmt(v, 12)).join(', ')}${om ? `, … ${om} more omitted` : ''}]`;
+    if (STACK_TYPES.includes(n.type)) return `${n.type} ${lane.ids[0]}${tag(lane.ids[0])}: ${body} (bottom to top)`;
+    if (QUEUE_TYPES.includes(n.type)) return `${n.type} ${lane.ids[0]}${tag(lane.ids[0])}: ${body} (front to back)`;
+    return `${n.type} ${lane.ids[0]}${tag(lane.ids[0])}: ${body}`;
   }
   const linkField = linkFieldsByType(heap).get(lane.type);
   const parts = lane.ids.map((id) => `${nodeDisplay(heap[id], linkField).main}${tag(id)}`);
@@ -730,7 +749,7 @@ function routeLinksCompute(links: Link[], boxes: Record<string, Box>, sceneW: nu
     const pts = sampleBase(base, a);
     const fromArrayCell = a.kind === 'array' && !link.port;   // these leave the bottom edge, so a path that re-enters its own source is a fault too
     const m = base.match(/^M\s+(-?[\d.]+)\s+(-?[\d.]+)/)!;
-    const r: R = { link, a, b, start: fromArrayCell ? { x: a.x + cellCentre(link.cell ?? 0), y: a.y + a.h + 20 } : { x: a.x + Number(m[1]), y: a.y + Number(m[2]) }, base };
+    const r: R = { link, a, b, start: fromArrayCell ? { x: a.x + cellAnchor(a, link.cell ?? 0).x, y: a.y + cellAnchor(a, link.cell ?? 0, 20).y } : { x: a.x + Number(m[1]), y: a.y + Number(m[2]) }, base };
     let overCaption = false;
     if (pts.length) {
       let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
