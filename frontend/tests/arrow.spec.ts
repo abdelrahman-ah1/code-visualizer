@@ -16,7 +16,9 @@ test('active line shows an arrow and tag, and a breakpoint on it stays visible',
   const active = page.locator('.code-line[aria-current="step"]');
   await expect(active).toHaveCount(1);
   await expect(active.locator('.exec-arrow')).toHaveText('▶');
-  await expect(page.locator('.exec-arrow:not(:empty)')).toHaveCount(1);
+  // One "runs next" marker; the faint "just ran" marker (visualization plan B2) sits on at most one other line.
+  await expect(page.locator('.code-line:not(.ran) .exec-arrow:not(:empty)')).toHaveCount(1);
+  expect(await page.locator('.code-line.ran').count()).toBeLessThanOrEqual(1);
   await active.locator('.line-number').click();            // breakpoint on the active line
   await expect(active.locator('.line-number')).toHaveClass(/bp-on/);
   await expect(active.locator('.exec-arrow')).toHaveText('▶');
@@ -25,7 +27,7 @@ test('active line shows an arrow and tag, and a breakpoint on it stays visible',
   await page.locator('.source-panel').screenshot({ path: `${SHOTS}/arrow-light.png` });
   // Terminal snapshot (a return event here): it gets a return marker and no "about to run" wording anywhere.
   await page.getByRole('button', { name: 'Last', exact: true }).click();
-  await expect(page.locator('.exec-arrow:not(:empty)')).toHaveCount(1);
+  await expect(page.locator('.code-line:not(.ran) .exec-arrow:not(:empty)')).toHaveCount(1);
   await expect(page.getByText('about to run')).toHaveCount(0);
   await page.screenshot({ path: `${SHOTS}/arrow-last.png` });
 });
