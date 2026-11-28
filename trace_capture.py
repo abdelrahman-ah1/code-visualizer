@@ -96,6 +96,28 @@ def capture(source, stdin="", timeout=2.0, max_events=500, max_output=8192, as_j
                         events.append(json.loads(line))
                     except json.JSONDecodeError:
                         break  # A kill can interrupt the final write.
+        # Accesses live in their own optional file, one entry per step: the event stream keeps its old shape and a
+        # killed run loses nothing it used to keep. Each entry belongs to the step whose line performed it.
+        access_file = root / "accesses.jsonl"
+        if access_file.exists():
+            by_step = {}
+            for line in access_file.read_text(encoding="utf-8").splitlines():
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    break   # A kill can interrupt the final write.
+                by_step[entry["step"]] = entry["accesses"]
+            if by_step and as_json:
+                merged = []
+                for i, line in enumerate(raw_lines):
+                    if i in by_step:
+                        line = json.dumps(dict(json.loads(line), accesses=by_step[i]), separators=(",", ":"))
+                    merged.append(line)
+                raw_lines = merged
+            else:
+                for i, event in enumerate(events):
+                    if i in by_step:
+                        event["accesses"] = by_step[i]
         final = root / "final.json"
         result = json.loads(final.read_text(encoding="utf-8")) if final.exists() else {}
         if timed_out:
