@@ -98,9 +98,10 @@ footer { color:var(--muted); font-size:11px; border-top:1px solid var(--line); m
 .changed .node-box,.changed .cell-box { animation:flash 1.1s ease-out; }
 /* Access marks: the element this step's line read or wrote. Shape, not colour: a thin ring for a read, a thick one with
    an arrow-in for a write, dashed when the tracer only knew the line. Static under reduced motion: it is information. */
-.access-ring { fill:none; stroke:var(--accent); stroke-linejoin:round; }
+.access-ring { fill:none; stroke:var(--accent); stroke-linejoin:round; pointer-events:none; }
+.access-ring.strong { fill:var(--accent); fill-opacity:.07; filter:drop-shadow(0 0 2px var(--accent)); }   /* the element written to: bright. A read is a plain ring. */
 .access-ring.guess { stroke-dasharray:4 3; }
-.access-in { fill:var(--accent); }
+.access-in { fill:var(--accent); filter:drop-shadow(0 0 2px var(--accent)); }
 @media(prefers-reduced-motion:no-preference) { .access-ring,.access-in { animation:access-in .3s ease both; } }
 @keyframes access-in { from { opacity:0 } to { opacity:1 } }
 @keyframes pop { from { opacity:0; transform:scale(.7); } to { opacity:1; transform:scale(1); } }
