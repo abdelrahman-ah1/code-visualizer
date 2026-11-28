@@ -220,6 +220,60 @@ class Accesses(unittest.TestCase):
         self.assertEqual([m["cell"] for m in self.entries(result)], list(range(2, 10)))
         self.assertEqual(value(result["events"][-1], "x"), sum(range(10)))
 
+    def test_dict_subscripts_mark_the_key_whatever_its_type(self):
+        result = capture("d = {1: 'x', 'k': 2}\nd[1] = 'y'\nn = len(d[1]) + d['k']\n")
+        d_id = locals_of(result["events"][-1])["d"]["id"]
+        entries = self.entries(result)
+        self.assertIn({"id": d_id, "mode": "write", "line": 2, "key": 1}, entries)   # an int key is a key, not a cell
+        self.assertIn({"id": d_id, "mode": "read", "line": 3, "key": 1}, entries)
+        self.assertIn({"id": d_id, "mode": "read", "line": 3, "key": "k"}, entries)
+        self.assertTrue(all("cell" not in m for m in entries))
+        self.assertEqual(value(result["events"][-1], "n"), 3)
+
+    def test_object_fields_are_read_written_and_updated(self):
+        src = ("class P:\n    def __init__(self):\n        self.n = 1\n"
+               "p = P()\np.n += 4\nq = p.n\np.n = q\n")
+        result = capture(src)
+        p_id = locals_of(result["events"][-1])["p"]["id"]
+        entries = self.entries(result)
+        self.assertIn({"id": p_id, "mode": "write", "line": 3, "field": "n"}, entries)
+        self.assertIn({"id": p_id, "mode": "readwrite", "line": 5, "field": "n"}, entries)
+        self.assertIn({"id": p_id, "mode": "read", "line": 6, "field": "n"}, entries)
+        self.assertIn({"id": p_id, "mode": "write", "line": 7, "field": "n"}, entries)
+        self.assertEqual(value(result["events"][-1], "q"), 5)
+
+    def test_methods_modules_and_class_attributes_are_not_fields(self):
+        src = ("import math\nclass C:\n    K = 3\n    def f(self):\n        return 1\n"
+               "c = C()\nitems = []\nitems.append(c.K + c.f() + int(math.pi))\n")
+        result = capture(src)
+        self.assertEqual(value(result["events"][-1], "items"), [7])
+        self.assertEqual(self.entries(result), [])
+
+    def test_the_rewrite_leaves_private_names_patterns_and_chains_alone(self):
+        # self.__p is mangled by the compiler, `case E.RED` must stay a dotted name, a.b.c = x has a call on its left.
+        src = ("class E:\n    RED = 1\nclass B:\n    def __init__(self):\n        self.__p = 1\n"
+               "    def get(self):\n        return self.__p\nclass A:\n    pass\n"
+               "a = A()\na.b = A()\na.b.c = 7\nr = 0\nmatch 1:\n    case E.RED:\n        r = B().get() + a.b.c\n"
+               "    case _:\n        r = -1\n")
+        result = capture(src)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(value(result["events"][-1], "r"), 8)
+
+    def test_a_chained_store_marks_the_write_and_keeps_its_order(self):
+        # The right-hand side runs before the object on the left: a side effect in either must still happen in that order.
+        src = ("log = []\nclass A:\n    pass\na = A()\na.b = A()\n"
+               "def val():\n    log.append('v')\n    return 3\ndef obj():\n    log.append('o')\n    return a.b\nobj().c = val()\n")
+        result = capture(src)
+        last = result["events"][-1]
+        self.assertEqual(value(last, "log"), ["v", "o"])
+        self.assertTrue(any(m.get("field") == "c" and m["mode"] == "write" for m in self.entries(result)))
+
+    def test_a_property_still_runs(self):
+        src = ("class T:\n    def __init__(self):\n        self._v = 2\n    @property\n    def v(self):\n        return self._v * 10\n"
+               "t = T()\nx = t.v\n")
+        result = capture(src)
+        self.assertEqual(value(result["events"][-1], "x"), 20)
+
     def test_slices_and_del_are_not_marked(self):
         # A slice is one mark for a range and del is neither a read nor a write: both stay unmarked on purpose.
         result = capture("a = [1, 2, 3]\nb = a[0:2]\ndel a[0]\na[0] = 9\n")
