@@ -651,35 +651,60 @@ export function changedBetween(prev: TraceEvent | undefined, cur: TraceEvent): {
 // Only a cell of a drawn array family is ringed here; a dict key, an object field or a graph vertex is kept for the
 // text summary and drawn in a later slice.
 export const ACCESS_RINGS = 2;   // more than two rings in one step reads as noise, not as information
-export interface AccessTarget { id: string; cell: number; mode: AccessMode; exact: boolean }
+// One ring: an array `cell`, a card `row` (a dict entry, or a field of an object drawn as a card), or a record (a list node
+// or plain object drawn as a node): the whole node is ringed, `field` names the field touched last, for the words.
+export interface AccessTarget { id: string; mode: AccessMode; exact: boolean; cell?: number; row?: number; field?: string }
+const sameKey = (v: Value, key: AccessMark['key']) => v.kind === 'scalar' && v.value === key;   // strict: 1, '1' and true are three keys
 export function accessTargets(scene: Scene, event: TraceEvent): AccessTarget[] {
   const marks = event.accesses ?? [];
   if (!marks.length) return [];
-  const out: AccessTarget[] = [];
+  const out: AccessTarget[] = [], mode = (m: AccessMark) => ({ mode: m.mode, exact: m.exact !== false });
   for (const m of marks) {
-    const box = scene.boxes[m.id];
-    if (!box || box.kind !== 'array' || m.cell === undefined) continue;   // not drawn this step, or nothing to point at
-    const cells = Math.max(1, event.heap[m.id]?.items?.length ?? 0);
-    if (m.cell < 0 || m.cell >= cells) continue;                          // the recording cut that cell off
-    out.push({ id: m.id, cell: m.cell, mode: m.mode, exact: m.exact !== false });
+    const box = scene.boxes[m.id], node = event.heap[m.id];
+    if (!box || !node) continue;                                          // not drawn this step: nothing to point at
+    if (box.kind === 'array') {
+      if (m.cell === undefined) continue;
+      const cells = Math.max(1, node.items?.length ?? 0);
+      if (m.cell < 0 || m.cell >= cells) continue;                        // the recording cut that cell off
+      out.push({ id: m.id, cell: m.cell, ...mode(m) });
+    } else if (box.kind === 'node' || (box.kind === 'card' && box.rec)) {   // a list node or a plain object drawn as a record
+      if (m.field !== undefined && node.fields && m.field in node.fields) out.push({ id: m.id, field: m.field, ...mode(m) });
+    } else if (box.kind === 'card' && !box.vertex) {
+      const rows = cardRows(node);
+      let row = -1;
+      if (m.field !== undefined) row = Object.keys(node.fields ?? {}).indexOf(m.field);
+      else if (m.key !== undefined) {
+        const at = (node.entries ?? []).findIndex(([k]) => sameKey(k, m.key));
+        row = at < 0 ? -1 : Object.keys(node.fields ?? {}).length + (node.items?.length ?? 0) + at;
+      }
+      if (row >= 0 && row < rows.length) out.push({ id: m.id, row, ...mode(m) });
+    }
   }
-  const seen = new Set<string>(), kept: AccessTarget[] = [];
-  for (const t of out.reverse()) {                                        // the last touch of a cell wins it
-    const key = `${t.id}:${t.cell}`;
-    if (seen.has(key)) continue;
-    seen.add(key); kept.push(t);
+  // A node is one ring however many of its fields the line touched: its modes merge (a read and a write is a read-write,
+  // so the thick ring and the arrow-in stay honest). Cells and rows are separate places: the last touch of one wins it.
+  const mergeMode = (a: AccessMode, b: AccessMode): AccessMode => (a === b ? a : 'readwrite');
+  const seen = new Map<string, AccessTarget>(), order: string[] = [];
+  for (const t of out) {
+    const key = t.field !== undefined ? `${t.id}:node` : `${t.id}:${t.cell ?? ''}:${t.row ?? ''}`, before = seen.get(key);
+    if (before) order.splice(order.indexOf(key), 1);
+    seen.set(key, before && t.field !== undefined ? { ...t, mode: mergeMode(before.mode, t.mode), exact: before.exact && t.exact } : t);
+    order.push(key);
   }
-  return kept.reverse().slice(-ACCESS_RINGS);                             // the most recent rings survive the cap
+  return order.map((k) => seen.get(k)!).slice(-ACCESS_RINGS);                             // the most recent rings survive the cap
 }
 
-// The step's accesses in words, for the lane summary: "(reading cell 2)", "(writing cells 1, 3)".
-export function accessClause(lane: SceneLane, event: TraceEvent): string {
-  const marks = (event.accesses ?? []).filter((m) => m.cell !== undefined && lane.ids.includes(m.id));
+// The step's accesses in words, for the lane summary and the tooltips: "(reading cell 2)", "(writing key 'a')",
+// "(reading field next)". Every mark is listed, drawn or not: the ring cap and a not-yet-existing key never hide one.
+const keyWord = (k: AccessMark['key']) => (typeof k === 'string' ? `'${k}'` : k === null ? 'None' : k === true ? 'True' : k === false ? 'False' : String(k));
+export function accessClause(lane: { ids: string[] }, event: TraceEvent): string {
+  const marks = (event.accesses ?? []).filter((m) => lane.ids.includes(m.id) && (m.cell !== undefined || m.key !== undefined || m.field !== undefined));
   if (!marks.length) return '';
   const word = (m: AccessMark) => (m.mode === 'read' ? 'reading' : m.mode === 'write' ? 'writing' : 'reading and writing');
-  const groups = new Map<string, number[]>();
-  for (const m of marks) groups.set(word(m), [...(groups.get(word(m)) ?? []), m.cell!]);
-  return ` (${[...groups].map(([w, cells]) => `${w} ${cells.length > 1 ? 'cells' : 'cell'} ${cells.join(', ')}`).join('; ')})`;
+  const noun = (m: AccessMark) => (m.cell !== undefined ? 'cell' : m.field !== undefined ? 'field' : 'key');
+  const what = (m: AccessMark) => (m.cell !== undefined ? String(m.cell) : m.field !== undefined ? m.field : keyWord(m.key));
+  const groups = new Map<string, string[]>();
+  for (const m of marks) { const g = `${word(m)} ${noun(m)}`; groups.set(g, [...(groups.get(g) ?? []), what(m)]); }
+  return ` (${[...groups].map(([g, things]) => { const [w, n] = [g.slice(0, g.lastIndexOf(' ')), g.slice(g.lastIndexOf(' ') + 1)]; return `${w} ${things.length > 1 ? `${n}s` : n} ${things.join(', ')}`; }).join('; ')})`;
 }
 
 // Plain-text version of each lane, for screen readers and for tests: "3 → 2 → 1 → None".
@@ -696,7 +721,7 @@ export function laneSummary(lane: SceneLane, event: TraceEvent, scene: Scene): s
   const linkField = linkFieldsByType(heap).get(lane.type);
   const parts = lane.ids.map((id) => `${nodeDisplay(heap[id], linkField).main}${tag(id)}`);
   const end = lane.end === 'null' ? 'None' : lane.end === 'cycle' ? `back to ${nodeDisplay(heap[lane.endTo!], linkField).main}` : lane.end === 'join' ? `joins ${lane.endTo}` : 'end';
-  return `${lane.type} list ${lane.ids[0]}: ${[...parts, end].join(' → ')}`;
+  return `${lane.type} list ${lane.ids[0]}: ${[...parts, end].join(' → ')}${accessClause(lane, event)}`;
 }
 
 // ---- Arrow routing -------------------------------------------------------------------------------------------------
