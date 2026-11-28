@@ -4,6 +4,8 @@ import { CARD, GEOM, REC, arrayOmitted, cardRows, portY, cellCentre, accessTarge
 import type { Link, Scene } from '../structures';
 import type { Value } from '../types';
 import { FRAMES_W, FramesColumn, layoutFrames } from './Frames';
+import { indexMarks } from '../indexmarks';
+import type { IndexMark } from '../indexmarks';
 
 // Draws one Scene. Layout comes from structures.ts. This file only turns boxes and arrows into SVG.
 // Each box sits in its own <g> whose CSS transform is animated, so a box slides when its position changes.
@@ -34,7 +36,7 @@ function Pointer({ name, value, x, y, drawn, nullWord, strip }: { name: string; 
 }
 
 const ORPHAN_HINT = 'Not reachable through the captured roots at this step: no captured local, global, file-level static or top-level function-static leads to this block, directly or through other blocks. It is still allocated, so this is not a leak report. Statics in nested blocks or lambdas, thread-locals, registers and unmanaged buffers are not captured.';
-export const Structures = memo(function Structures({ scene, event, prev, prevScene, nullWord = 'None' }: { scene: Scene; event: TraceEvent; prev?: TraceEvent; prevScene?: Scene; nullWord?: string }) {
+export const Structures = memo(function Structures({ scene, event, prev, prevScene, nullWord = 'None', source = '' }: { scene: Scene; event: TraceEvent; prev?: TraceEvent; prevScene?: Scene; nullWord?: string; source?: string }) {
   const [zoom, setZoom] = useState(1), box = useRef<HTMLDivElement>(null), drag = useRef<{ x: number; y: number; l: number; t: number } | null>(null);
   // Visualization plan A1: the frames column (variables with arrows into the diagram). On by default; the reader can hide it.
   const [showVars, setShowVars] = useState(true);
@@ -51,6 +53,12 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
   // The elements this step's line touched, at most two of them: a thin ring for a read, a thick one with an arrow for a
   // write, dashed when the tracer only knew the line. The changed-object flash keeps the colour job; the ring is shape.
   const rings = useMemo(() => accessTargets(scene, event), [scene, event]);
+  // Visualization plan C1: index variables (i, lo, hi ...) under the cells of the horizontal arrays they index.
+  const marks = useMemo(() => {
+    const arrays = new Map<string, number>();
+    for (const lane of scene.lanes) if (lane.kind === 'array') for (const id of lane.ids) { const b = scene.boxes[id], n = event.heap[id]; if (b && !b.stack && !b.queue && n?.items && !arrayOmitted(n)) arrays.set(id, n.items.length); }
+    return arrays.size ? indexMarks(event, source, arrays) : new Map<string, IndexMark[]>();
+  }, [scene, event, source]);
   const ringAt = (id: string, cell: number) => rings.find((r) => r.id === id && r.cell === cell);
   // A ring on a card row or a record line: the rectangle around it, thin for a read, thicker with an arrow-in for a write (on the left of a row, on top of a whole node).
   const ringBox = (r: { id: string; mode: string; exact: boolean }, at: { x: number; y: number; w: number; h: number }, name: string, top = false) => {
@@ -60,6 +68,11 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
       {r.mode !== 'read' && <path className="access-in" d={top ? `M ${at.x + at.w / 2 - 5} ${at.y - 13} L ${at.x + at.w / 2 + 5} ${at.y - 13} L ${at.x + at.w / 2} ${at.y - 6} Z` : `M ${at.x - 14} ${at.y + at.h / 2 - 5} L ${at.x - 14} ${at.y + at.h / 2 + 5} L ${at.x - 7} ${at.y + at.h / 2} Z`}/>}
     </g>;
   };
+  const ghosts = useMemo(() => (prev && prevScene && prev.step === event.step - 1
+    ? Object.entries(prevScene.boxes).filter(([id, g]) => prev.heap[id] && !scene.boxes[id] && !event.heap[id]
+      // A new box drawn on the same spot wins: a ghost under it would only blur both. "What this step did" still lists it.
+      && !Object.values(scene.boxes).some((b) => b.x < g.x + g.w && g.x < b.x + b.w && b.y < g.y + g.h && g.y < b.y + b.h)).map(([id, b]) => [id, b, prev.heap[id].type] as const)
+    : []), [prev, prevScene, scene, event]);
   const linksFrom = (id: string) => scene.links.filter((l) => l.from === id);
   const mark = (id: string) => (prevScene && !prevScene.boxes[id] ? 'enter' : changed.has(id) ? 'changed' : '');
   // The arrows that touch what this step changed stay in the accent colour; the rest go quiet, so one step reads as one path.
@@ -157,6 +170,11 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
       <svg width={Math.ceil(totalW * zoom)} height={Math.ceil(totalH * zoom)} viewBox={`0 0 ${totalW} ${totalH}`} role="img" aria-label={summaries.join('. ')} data-testid="structure-svg" data-zoom={zoom}>
         <defs><marker id="cv-arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" className="arrowhead"/></marker><marker id="cv-arrowhead-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" className="arrowhead-muted"/></marker><marker id="cv-var-head" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10z" className="var-head"/></marker><marker id="cv-var-head-quiet" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10z" className="var-head quiet"/></marker></defs>
         <g className="heap-area" transform={offX ? `translate(${offX} 0)` : undefined}>
+        {/* Visualization plan C2: objects that dropped out of this step fade out where they were, instead of vanishing. */}
+        {ghosts.map(([id, b, type]) => <g key={`${id}@${event.step}`} className="ghost" data-testid={`ghost-${id}`} transform={`translate(${b.x} ${b.y})`}>
+          <title>{`${type} ${id} is no longer reachable at this step`}</title>
+          <rect className="ghost-box" width={b.w} height={Math.min(b.h, b.mainH ?? b.h)} rx="8"/>
+          <text className="ghost-label" x={b.w / 2} y={Math.min(b.h, b.mainH ?? b.h) / 2 + 4} textAnchor="middle">{clipText(`${id} gone`, Math.max(4, Math.floor(b.w / 7)))}</text></g>)}
         {scene.cards.map((id) => {
           const b = scene.boxes[id], node = event.heap[id], tag = scene.tags[id], m = mark(id);
           if (b.vertex) return renderVertex(id, b, node, tag, m);
@@ -208,6 +226,10 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
               })}
               {items.length === 0 && omitted === 0 && <g className="cell" data-testid="empty-array"><rect className="cell-box empty" width={GEOM.cell} height={GEOM.cell}/><text className="cell-value" x={GEOM.cell / 2} y={GEOM.cell / 2 + 4} textAnchor="middle">[ ]</text><title>{`empty ${node.type}`}</title></g>}
               {omitted > 0 && <g className="cell"><rect className="cell-box omitted" x={box.stack ? 0 : items.length * GEOM.cell} y={box.stack ? 0 : 0} width={GEOM.cell} height={GEOM.cell}/><text className="cell-value" x={(box.stack ? 0 : items.length * GEOM.cell) + GEOM.cell / 2} y={GEOM.cell / 2 + 4} textAnchor="middle">…</text><title>{`${omitted} more not captured`}</title></g>}
+              {(marks.get(id) ?? []).filter((mk) => items[mk.cell]?.kind !== 'ref').map((mk) => { const x = cellCentre(mk.cell), label = mk.names.join(', ');
+                return <g key={`im${mk.cell}`} className={`index-mark${mk.pastEnd ? ' past-end' : ''}`} data-testid={`imark-${id}-${mk.cell}`}><title>{`${label} = ${mk.cell}${mk.pastEnd ? ', one past the last cell' : ''}`}</title>
+                  {mk.pastEnd && <rect className="cell-box past-end" x={mk.cell * GEOM.cell} y={0} width={GEOM.cell} height={GEOM.cell}/>}
+                  <path d={`M ${x} ${GEOM.cell + 18} l 5 7 l -10 0 z`}/><text x={x} y={GEOM.cell + 38} textAnchor="middle">{clipText(label, 9)}</text></g>; })}
               {box.stack && items.length > 0 && omitted === 0 && <text className="sq-mark" data-testid="stack-top" x={GEOM.cell + 8} y={cy(items.length - 1) + GEOM.cell / 2 + 4}>top</text>}
               {/* Front and back are marks under the first and last cell, but two marks that would touch are drawn as one caption
                   instead: a one-cell queue used to draw "front" and "back" on top of each other. */}

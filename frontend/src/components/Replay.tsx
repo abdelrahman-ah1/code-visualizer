@@ -51,7 +51,7 @@ export function Replay({ trace, breakpoints, onToggleBreakpoint, watches, onAddW
         </section>
       </div>
       <div className={`col-right ${shown === 'closed' ? 'closed' : ''}`}>
-        {event && <Structures nullWord={nullWord} scene={scenes.get(p.index)} event={event} prev={trace.events[p.index - 1]} prevScene={scenes.get(p.index - 1)}/>}
+        {event && <Structures nullWord={nullWord} source={trace.source} scene={scenes.get(p.index)} event={event} prev={trace.events[p.index - 1]} prevScene={scenes.get(p.index - 1)}/>}
         <section className="panel tabs-panel" aria-label="Details">
           <div className="tabs" role="tablist" aria-label="Details panels">
             {TABS.map((t) => <button type="button" role="tab" key={t.id} id={`tab-${t.id}`} aria-selected={shown === t.id} aria-controls="tabpanel" className={`tab ${shown === t.id ? 'on' : ''}`} onClick={() => setTab(shown === t.id ? 'closed' : t.id)}>{t.label}{t.id === 'findings' && found > 0 && <span className="badge" aria-label={`${found} errors`}>{found}</span>}</button>)}

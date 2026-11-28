@@ -279,3 +279,15 @@ main[data-theme=light] .bp-hit { color:#a01628; }
   .var-arrow { animation:arrow-in .35s ease both; }
 }
 @keyframes row-flash { 0% { fill:color-mix(in srgb, var(--warn) 45%, transparent); } 100% { fill:transparent; } }
+/* Visualization plan C1: index variables under array cells. */
+.index-mark path { fill:var(--warn); }
+.index-mark text { font:600 11px ui-monospace, monospace; fill:var(--warn); }
+.index-mark .cell-box.past-end { fill:none; stroke:var(--warn); stroke-dasharray:4 3; opacity:.7; }
+.vnode .index-mark { transition:none; }
+/* Visualization plan C2: a box that dropped out of the step fades away where it was. */
+.ghost { pointer-events:none; }
+.ghost-box { fill:none; stroke:var(--muted); stroke-width:1.5; stroke-dasharray:5 4; }
+.ghost-label { font:11px ui-monospace, monospace; fill:var(--muted); }
+@media(prefers-reduced-motion:no-preference) { .ghost { animation:ghost-out 1.4s ease-out forwards; } }
+@media(prefers-reduced-motion:reduce) { .ghost { display:none; } }
+@keyframes ghost-out { 0% { opacity:.9; } 100% { opacity:0; } }
