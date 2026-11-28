@@ -1,4 +1,5 @@
 """Worker implementation. Internal protocol; use trace_capture.py to launch."""
+import ast
 import errno
 import io
 import json
@@ -141,6 +142,8 @@ class Encoder:
             for name, value in frame.f_locals.copy().items():
                 if name.startswith("__"):
                     continue
+                if name.startswith("_cv"):
+                    continue   # the access helpers the rewrite injects are the tracer's, never the program's
                 if len(bindings) >= 40:
                     truncated.append("locals")
                     break
@@ -155,6 +158,131 @@ def _lineno(frame):
     """The line an event points at. Python 3.12+ reports 0 for a just-created module frame's 'call' event
     (earlier versions reported the first line); fall back to the code's first line so events always point into the source."""
     return frame.f_lineno or frame.f_code.co_firstlineno
+
+
+# ---- element accesses (see TRACE_FORMAT.md, "accesses") ----------------------------------------
+# The source is rewritten before it is compiled so the tracer learns which cell, row or key the code touched.
+# The helpers only note and then do exactly what the original expression did; they never change a result.
+ACCESS_CAP = 8
+
+
+class AccessLog:
+    """Accesses seen since the last written event. A Python line event fires before its line runs, so the accesses a
+    line performs are attached to the next record: the trace function holds each record back until the next event."""
+
+    def __init__(self):
+        self.items = []
+
+    def note(self, container, index, mode, line):
+        try:
+            self.items.append((id(container), index, mode, line))
+            if len(self.items) > ACCESS_CAP:
+                del self.items[0]
+        except Exception:
+            pass
+
+    def drain(self, ids):
+        if not self.items:
+            return None
+        out = []
+        for oid, index, mode, line in self.items:
+            heap_id = ids.get(oid)
+            if heap_id is None:
+                continue                      # the object was never captured: no mark, never a guess
+            entry = {"id": heap_id, "mode": mode, "line": line}
+            if isinstance(index, bool):
+                continue
+            if isinstance(index, int):
+                entry["cell"] = index
+            elif isinstance(index, str):
+                entry["key"] = index
+            else:
+                continue
+            out.append(entry)
+        self.items.clear()
+        return out or None
+
+
+ACCESS = AccessLog()
+
+
+def _cv_get(container, index):
+    ACCESS.note(container, index, "read", sys._getframe(1).f_lineno)
+    return container[index]
+
+
+def _cv_set(container, index, value):
+    ACCESS.note(container, index, "write", sys._getframe(1).f_lineno)
+    container[index] = value
+    return value
+
+
+def _cv_aug(container, index):
+    ACCESS.note(container, index, "readwrite", sys._getframe(1).f_lineno)
+
+
+def _cv_iter(seq, index):
+    if isinstance(seq, (str, bytes, bytearray, set, frozenset)):
+        return                      # no cells to point at: a position in a string or set means nothing on screen
+    ACCESS.note(seq, index, "read", sys._getframe(1).f_lineno)
+
+
+def _cv_enum(seq):
+    """A dict loop hands over keys, so the note carries the key; the loop variable still gets the key, not a position."""
+    return ((key, key) for key in seq) if isinstance(seq, dict) else enumerate(seq)
+
+
+INDEX = "__cv_index__"
+
+
+class AccessTransform(ast.NodeTransformer):
+    """v[i] -> _cv_get(v, i); v[i] = x -> _cv_set(v, i, x); v[i] += x -> note, then the original statement;
+    for x in seq -> for __cv_index__, x in _cv_enum(seq) plus one note. Slices, del, chained assignment, attribute
+    access and `for x in expr` where expr is not a bare name are left alone (documented false negatives). Every
+    rewritten node keeps its original line, so stepping does not move."""
+
+    def visit_Subscript(self, node):
+        self.generic_visit(node)
+        if isinstance(node.slice, ast.Slice) or not isinstance(node.ctx, ast.Load):
+            return node
+        call = ast.Call(func=ast.Name(id="_cv_get", ctx=ast.Load()), args=[node.value, node.slice], keywords=[])
+        return ast.copy_location(call, node)
+
+    def visit_Assign(self, node):
+        self.generic_visit(node)
+        if len(node.targets) == 1:
+            t = node.targets[0]
+            if isinstance(t, ast.Subscript) and not isinstance(t.slice, ast.Slice):
+                call = ast.Call(func=ast.Name(id="_cv_set", ctx=ast.Load()), args=[t.value, t.slice, node.value], keywords=[])
+                return ast.copy_location(ast.Expr(value=call), node)
+        return node
+
+    def visit_AugAssign(self, node):
+        self.generic_visit(node)
+        t = node.target
+        if isinstance(t, ast.Subscript) and not isinstance(t.slice, ast.Slice):
+            note = ast.Expr(value=ast.Call(func=ast.Name(id="_cv_aug", ctx=ast.Load()), args=[t.value, t.slice], keywords=[]))
+            return [ast.copy_location(note, node), node]
+        return node
+
+    def visit_For(self, node):
+        self.generic_visit(node)
+        if isinstance(node.iter, ast.Name):
+            note = ast.Expr(value=ast.Call(func=ast.Name(id="_cv_iter", ctx=ast.Load()),
+                                           args=[node.iter, ast.Name(id=INDEX, ctx=ast.Load())], keywords=[]))
+            node.iter = ast.Call(func=ast.Name(id="_cv_enum", ctx=ast.Load()), args=[node.iter], keywords=[])
+            node.target = ast.Tuple(elts=[ast.Name(id=INDEX, ctx=ast.Store()), node.target], ctx=ast.Store())
+            node.body.insert(0, ast.copy_location(note, node))
+            ast.fix_missing_locations(node)
+        return node
+
+
+def instrument(tree):
+    """The transformed tree, with every new node carrying the line of the code it stands for."""
+    import ast as _ast
+    out = AccessTransform().visit(tree)
+    _ast.fix_missing_locations(out)
+    return out
 
 
 def _delta(old, new):
@@ -210,6 +338,18 @@ def run(root):
         for name in ("nodes", "frames", "stdout", "stderr"):
             side[name] = (root / (name + ".txt")).open("w", encoding="utf-8", errors="surrogatepass", newline="", buffering=1)
 
+    access_stream = [None]
+
+    def flush_accesses(step):
+        """Accesses are a separate, optional file keyed by step: the event stream is written exactly as before, so a
+        run that is killed loses nothing it used to keep. Readers attach each entry to that step's event."""
+        found = ACCESS.drain(encoder.ids)
+        if not found or step < 0:
+            return
+        if access_stream[0] is None:
+            access_stream[0] = (root / "accesses.jsonl").open("w", encoding="utf-8", buffering=1)
+        access_stream[0].write(_ENCODE({"step": step, "accesses": found}) + "\n")
+
     def u16(key, text):
         # Lengths are in UTF-16 units because that is what the viewer's string slice counts.
         last, n = out_len[key]
@@ -229,6 +369,7 @@ def run(root):
                 return trace
             if count >= req["max_events"]:
                 raise TraceLimit("events", req["max_events"])
+            flush_accesses(count - 1)   # what the previous line touched; a line event fires before its own line runs
             frames = []
             cursor = frame
             while cursor:
@@ -281,15 +422,18 @@ def run(root):
             count += 1
             return trace
         try:
-            code = compile(req["source"], FILENAME, "exec")
             # Explicitly reject constructs whose scheduling this starter cannot model.
             import ast
             tree = ast.parse(req["source"])
             if any(isinstance(node, (ast.Yield, ast.YieldFrom, ast.Await, ast.AsyncFunctionDef, ast.AsyncFor, ast.AsyncWith, ast.GeneratorExp)) for node in ast.walk(tree)):
                 status = "unsupported"
             else:
+                # The rewritten tree is what runs: it notes the cell, row or key each line touches, then does the same
+                # thing the original expression did. Line numbers are preserved, so stepping is unchanged.
+                code = compile(instrument(tree), FILENAME, "exec")
                 sys.settrace(trace)
-                exec(code, {"__name__": "__main__"})
+                exec(code, {"__name__": "__main__", "_cv_get": _cv_get, "_cv_set": _cv_set,
+                            "_cv_aug": _cv_aug, "_cv_iter": _cv_iter, "_cv_enum": _cv_enum})
         except TraceLimit as hit:
             status = "trace_limit"
             limit_hit = {"kind": hit.which, "limit": hit.limit}
@@ -305,8 +449,11 @@ def run(root):
                 error["line"] = exc.lineno
         finally:
             sys.settrace(None)
+    flush_accesses(count - 1)
     for f in side.values():
         f.close()
+    if access_stream[0] is not None:
+        access_stream[0].close()
     if pooled and used_delta:
         (root / "deltas.flag").write_text("1")
     final = {"status": status, "complete": status in ("ok", "error"),
