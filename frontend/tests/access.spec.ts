@@ -103,3 +103,42 @@ test('a recording made before access marking draws no rings', async ({ page }) =
   await expect(page.getByText(/Event 1 of \d+/)).toBeVisible({ timeout: 30000 });
   for (const i of [1, 2, 3, 4]) { await seek(page, i); expect(await rings(page).count()).toBe(0); }
 });
+
+// Dict keys and object fields (slice 4c): the same ring, on the row of the key or the line of the field.
+const KEYS = `class Node:
+    def __init__(self, val):
+        self.val = val
+        self.next = None
+head = Node(1)
+head.next = Node(2)
+count = {'a': 1, 'b': 2}
+count['a'] += 1
+total = head.val + head.next.val
+count['b'] = total
+print(count)
+`;
+async function ringedOn(page: Page, line: number) {
+  const step = await seekToMarked(page, line);
+  expect(step, `a step on line ${line} that touches something`).not.toBeNull();
+  return step!;
+}
+
+test('a dict key wears the ring on its row, and a field on its line or pointer compartment', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await run(page, KEYS);
+  await ringedOn(page, 8);                                      // count['a'] += 1: read and write of one key
+  await expect(rings(page)).toHaveCount(1);
+  await expect(rings(page).first()).toHaveAttribute('data-mode', 'readwrite');   // += reads and writes the one key: thick ring with the arrow-in
+  await expect(page.locator('[data-testid^="access-ring-"][data-testid$="-row0"]')).toHaveCount(1);
+  await page.locator('.structures').screenshot({ path: `${SHOTS}/access-dict-key.png` });
+  await ringedOn(page, 9);                                      // head.val + head.next.val: the last two touches are drawn
+  await expect(rings(page)).toHaveCount(2);
+  await expect(page.locator('[data-testid="access-ring-o1-node"]')).toHaveCount(1);
+  await expect(page.locator('[data-testid="access-ring-o2-node"]')).toHaveCount(1);
+  await expect(page.getByTestId('lane-summaries')).toContainText(/reading fields? [a-z, ]*val/);
+  await page.locator('.structures').screenshot({ path: `${SHOTS}/access-object-fields.png` });
+  await ringedOn(page, 10);                                     // count['b'] = total
+  await expect(page.locator('[data-testid$="-row1"]')).toHaveAttribute('data-mode', 'write');
+  await page.locator('.structures').screenshot({ path: `${SHOTS}/access-dict-write.png` });
+});
