@@ -107,7 +107,7 @@ describe('arrow routing', () => {
   for (const n of names) it(`${n}: no arrow passes through an unrelated box`, () => {
     const scenes = buildScenes(parseTrace(readFileSync(new URL(n, dir), 'utf8')));
     for (const [i, s] of scenes.entries()) { const c = crossings(s); expect(c.crossing, `${n} event ${i}`).toBe(0); expect(c.shared, `${n} event ${i} near-parallel pairs`).toBe(0); expect(c.labelHits, `${n} event ${i} over captions`).toBe(0); }
-  });
+  }, SLOW);   // the whole cpp_10 recording is walked scene by scene; at the 5s default it times out on a slow machine
   const big = process.env.CODEVIZ_ROUTE_TRACE;
   it.skipIf(!big)('large capture (CODEVIZ_ROUTE_TRACE): final scenes have no crossings', () => {
     const scenes = buildScenes(parseTrace(readFileSync(big!, 'utf8')));
