@@ -15,10 +15,15 @@ export interface Diagnostic {
   freed_line?: number; allocated_line?: number;
 }
 export interface Frame { depth: number; function: string; line: number; locals: Record<string, Value> }
+// One element a line touched: which captured object, which cell or key, and whether it was read or written.
+// `exact: false` means the tracer only knows the line, not the element (a guess, drawn dashed); Python never sends it.
+export type AccessMode = 'read' | 'write' | 'readwrite';
+export interface AccessMark { id: string; mode: AccessMode; line: number; cell?: number; key?: string; exact?: boolean }
 export interface TraceEvent {
   step: number; event: 'call' | 'line' | 'return' | 'exception'; line: number;
   frames: Frame[]; heap: Record<string, HeapNode>; stdout: string; stderr: string;
   truncated: string[]; return_value?: Value; exception_type?: string;
+  accesses?: AccessMark[];   // optional: recordings made before access marking have no such field
   unreached_heap?: { count: number; bytes: number };
 }
 export type RunStatus = 'ok' | 'error' | 'timeout' | 'trace_limit' | 'output_limit' | 'unsupported' | 'worker_error';
