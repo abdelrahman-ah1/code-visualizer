@@ -170,5 +170,78 @@ class EdgeCases(unittest.TestCase):
         self.assertEqual(result["error"]["type"], "EOFError")
 
 
+class Accesses(unittest.TestCase):
+    """Access marks: which object and cell a line touched, on the line that touched it."""
+
+    def entries(self, result):
+        return [m for e in result["events"] for m in e.get("accesses", [])]
+
+    def test_read_marks_the_fetching_line_and_the_cell(self):
+        result = capture("rows = [[7, 8]]\nx = rows[0][1]\n")
+        last = result["events"][-1]
+        rows_id = locals_of(last)["rows"]["id"]
+        inner_id = last["heap"][rows_id]["items"][0]["id"]
+        entries = self.entries(result)
+        self.assertIn({"id": rows_id, "mode": "read", "line": 2, "cell": 0}, entries)
+        self.assertIn({"id": inner_id, "mode": "read", "line": 2, "cell": 1}, entries)
+        self.assertTrue(all(m["line"] == 2 for m in entries))
+        self.assertEqual(value(last, "x"), 8)
+
+    def test_store_and_in_place_update(self):
+        result = capture("a = [0, 0]\na[1] = 5\na[0] += 2\n")
+        last = result["events"][-1]
+        a_id = locals_of(last)["a"]["id"]
+        entries = self.entries(result)
+        self.assertIn({"id": a_id, "mode": "write", "line": 2, "cell": 1}, entries)
+        self.assertIn({"id": a_id, "mode": "readwrite", "line": 3, "cell": 0}, entries)
+        self.assertEqual(value(last, "a"), [2, 5])
+
+    def test_loop_iteration_is_marked_on_the_for_line(self):
+        result = capture("rows = [[1], [2]]\ntotal = 0\nfor r in rows:\n    total += r[0]\n")
+        last = result["events"][-1]
+        rows_id = locals_of(last)["rows"]["id"]
+        entries = self.entries(result)
+        self.assertIn({"id": rows_id, "mode": "read", "line": 3, "cell": 0}, entries)
+        self.assertIn({"id": rows_id, "mode": "read", "line": 3, "cell": 1}, entries)
+        self.assertEqual(value(last, "total"), 3)
+
+    def test_dict_iteration_marks_the_key(self):
+        result = capture("d = {'a': 1, 'b': 2}\nseen = []\nfor k in d:\n    seen.append(k)\n")
+        last = result["events"][-1]
+        d_id = locals_of(last)["d"]["id"]
+        entries = self.entries(result)
+        self.assertIn({"id": d_id, "mode": "read", "line": 3, "key": "a"}, entries)
+        self.assertIn({"id": d_id, "mode": "read", "line": 3, "key": "b"}, entries)
+        self.assertEqual(value(last, "seen"), ["a", "b"])
+
+    def test_the_cap_keeps_the_last_eight(self):
+        expr = "+".join("a[%d]" % i for i in range(10))
+        result = capture("a = list(range(20))\nx = " + expr + "\n")
+        self.assertEqual([m["cell"] for m in self.entries(result)], list(range(2, 10)))
+        self.assertEqual(value(result["events"][-1], "x"), sum(range(10)))
+
+    def test_slices_and_del_are_not_marked(self):
+        # A slice is one mark for a range and del is neither a read nor a write: both stay unmarked on purpose.
+        result = capture("a = [1, 2, 3]\nb = a[0:2]\ndel a[0]\na[0] = 9\n")
+        entries = self.entries(result)
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["mode"], "write")
+        self.assertEqual(value(result["events"][-1], "b"), [1, 2])
+
+    def test_no_field_when_nothing_is_fetched(self):
+        # The field is optional, so a recording made before this feature still parses.
+        result = capture("x = 1\ny = x + 1\n")
+        self.assertTrue(all("accesses" not in e for e in result["events"]))
+
+    def test_a_killed_run_keeps_every_step(self):
+        result = capture("import time\nrows = [1]\nx = rows[0]\ntime.sleep(5)\n", timeout=0.5)
+        self.assertEqual(result["status"], "timeout")
+        self.assertEqual(result["events"][-1]["line"], 4)
+        self.assertEqual(value(result["events"][-1], "x"), 1)
+        # The mark for line 3 is already on disk: a kill costs the hanging line's marks, never the steps before it.
+        line3 = next(e for e in result["events"] if e["event"] == "line" and e["line"] == 3)
+        self.assertEqual([m["mode"] for m in line3["accesses"]], ["read"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
