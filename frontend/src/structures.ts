@@ -3,7 +3,7 @@
 // The job: read one trace snapshot and decide (a) which heap objects are linked-list nodes or
 // arrays, (b) which "lane" (row) each structure sits in, and (c) where every box goes.
 // Trace snapshots are never changed. Layout lives only in the Scene objects built here.
-import type { HeapNode, Trace, TraceEvent, Value } from './types';
+import type { AccessMark, AccessMode, HeapNode, Trace, TraceEvent, Value } from './types';
 import { layeredLayout, stabilize } from './graphlayout';
 
 export const GEOM = { nodeW: 124, nodeH: 56, gap: 52, cell: 46, pad: 28, tagH: 34, belowH: 56 };
@@ -646,15 +646,52 @@ export function changedBetween(prev: TraceEvent | undefined, cur: TraceEvent): {
   return { changed, added };
 }
 
+// ---- Access marks -------------------------------------------------------------------------------------------------
+// A step can say which element its line touched: `accesses` on the event, written by the tracer as {id, mode, cell|key}.
+// Only a cell of a drawn array family is ringed here; a dict key, an object field or a graph vertex is kept for the
+// text summary and drawn in a later slice.
+export const ACCESS_RINGS = 2;   // more than two rings in one step reads as noise, not as information
+export interface AccessTarget { id: string; cell: number; mode: AccessMode; exact: boolean }
+export function accessTargets(scene: Scene, event: TraceEvent): AccessTarget[] {
+  const marks = event.accesses ?? [];
+  if (!marks.length) return [];
+  const out: AccessTarget[] = [];
+  for (const m of marks) {
+    const box = scene.boxes[m.id];
+    if (!box || box.kind !== 'array' || m.cell === undefined) continue;   // not drawn this step, or nothing to point at
+    const cells = Math.max(1, event.heap[m.id]?.items?.length ?? 0);
+    if (m.cell < 0 || m.cell >= cells) continue;                          // the recording cut that cell off
+    out.push({ id: m.id, cell: m.cell, mode: m.mode, exact: m.exact !== false });
+  }
+  const seen = new Set<string>(), kept: AccessTarget[] = [];
+  for (const t of out.reverse()) {                                        // the last touch of a cell wins it
+    const key = `${t.id}:${t.cell}`;
+    if (seen.has(key)) continue;
+    seen.add(key); kept.push(t);
+  }
+  return kept.reverse().slice(-ACCESS_RINGS);                             // the most recent rings survive the cap
+}
+
+// The step's accesses in words, for the lane summary: "(reading cell 2)", "(writing cells 1, 3)".
+export function accessClause(lane: SceneLane, event: TraceEvent): string {
+  const marks = (event.accesses ?? []).filter((m) => m.cell !== undefined && lane.ids.includes(m.id));
+  if (!marks.length) return '';
+  const word = (m: AccessMark) => (m.mode === 'read' ? 'reading' : m.mode === 'write' ? 'writing' : 'reading and writing');
+  const groups = new Map<string, number[]>();
+  for (const m of marks) groups.set(word(m), [...(groups.get(word(m)) ?? []), m.cell!]);
+  return ` (${[...groups].map(([w, cells]) => `${w} ${cells.length > 1 ? 'cells' : 'cell'} ${cells.join(', ')}`).join('; ')})`;
+}
+
 // Plain-text version of each lane, for screen readers and for tests: "3 → 2 → 1 → None".
 export function laneSummary(lane: SceneLane, event: TraceEvent, scene: Scene): string {
   const heap = event.heap, tag = (id: string) => (scene.tags[id]?.length ? ` (${scene.tags[id].join(', ')})` : '');
   if (lane.kind === 'array') {
     const n = heap[lane.ids[0]], om = arrayOmitted(n);
     const body = `[${(n.items ?? []).map((v) => fmt(v, 12)).join(', ')}${om ? `, … ${om} more omitted` : ''}]`;
-    if (STACK_TYPES.includes(n.type)) return `${n.type} ${lane.ids[0]}${tag(lane.ids[0])}: ${body} (bottom to top)`;
-    if (QUEUE_TYPES.includes(n.type)) return `${n.type} ${lane.ids[0]}${tag(lane.ids[0])}: ${body} (front to back)`;
-    return `${n.type} ${lane.ids[0]}${tag(lane.ids[0])}: ${body}`;
+    const clause = accessClause(lane, event);
+    if (STACK_TYPES.includes(n.type)) return `${n.type} ${lane.ids[0]}${tag(lane.ids[0])}: ${body} (bottom to top)${clause}`;
+    if (QUEUE_TYPES.includes(n.type)) return `${n.type} ${lane.ids[0]}${tag(lane.ids[0])}: ${body} (front to back)${clause}`;
+    return `${n.type} ${lane.ids[0]}${tag(lane.ids[0])}: ${body}${clause}`;
   }
   const linkField = linkFieldsByType(heap).get(lane.type);
   const parts = lane.ids.map((id) => `${nodeDisplay(heap[id], linkField).main}${tag(id)}`);
