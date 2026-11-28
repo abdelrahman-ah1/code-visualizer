@@ -53,7 +53,10 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
   useEffect(() => {
     if (userZoom.current) return;
     const el = box.current; if (!el) return;
-    const k = Math.min((el.clientWidth - 12) / scene.width, (el.clientHeight - 12) / scene.height, 1);
+    // Fit to the boxes, not to the canvas: the canvas is a little taller when a step routes an arrow below the last
+    // row, and letting that overhang zoom the whole picture out would shrink every node for one long arrow.
+    const boxesBottom = Math.max(0, ...Object.values(scene.boxes).map((b) => b.y + b.h)) + 40;
+    const k = Math.min((el.clientWidth - 12) / scene.width, (el.clientHeight - 12) / Math.min(scene.height, boxesBottom), 1);
     setZoom(k < 0.95 ? Math.min(1, Math.max(0.45, Math.round(k * 100) / 100)) : 1);
   }, [scene.width, scene.height]);
   const renderRecord = (id: string, b: Scene['boxes'][string], node: TraceEvent['heap'][string], tag: string[] | undefined, m: string, chainField?: string) => {
