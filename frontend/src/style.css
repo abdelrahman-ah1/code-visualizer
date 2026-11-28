@@ -242,3 +242,14 @@ main[data-theme=light] .bp-hit { color:#a01628; }
 .ptr-strip { stroke-width:1; }
 .node-box.orphan { stroke:#e0a030; stroke-dasharray:5 3; }
 .edge-label { fill:var(--muted); font:10px 'SFMono-Regular',Consolas,monospace; paint-order:stroke; stroke:var(--panel,#10171c); stroke-width:3px; }
+/* Visualization plan B2: the line that just ran (faint) next to the line that runs next (bright). */
+.code-line.ran { background:color-mix(in srgb, var(--accent) 10%, var(--panel)); border-left:3px dashed color-mix(in srgb, var(--accent) 60%, transparent); }
+.code-line.ran .exec-arrow { opacity:.7; }
+.legend-ran { opacity:.75; }
+.legend-next { color:var(--accent); }
+/* Visualization plan B1: plain-words summary of the step. */
+.what-changed .wc-headline { margin:0 0 6px; font-weight:600; }
+.what-changed .wc-list { margin:0; padding-left:18px; font-size:13px; line-height:1.55; }
+.what-changed .wc-list li::marker { color:var(--accent); }
+.what-changed .wc-exception, .what-changed .wc-freed, .what-changed .wc-leak { color:var(--warn, #c77700); }
+.what-changed .wc-call, .what-changed .wc-return { font-weight:600; }

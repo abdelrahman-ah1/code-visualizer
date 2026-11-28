@@ -10,6 +10,8 @@ import { sceneCache } from '../structures';
 import { ValueView } from './ValueView';
 import { Watch } from './Watch';
 import { Diagnostics } from './Diagnostics';
+import { WhatChanged } from './WhatChanged';
+import { describeStep } from '../changes';
 import { buildLineIndex, stopIndexes, unreachedLines } from '../breakpoints';
 type TabId = 'heap' | 'stack' | 'watch' | 'findings';
 const TABS: { id: TabId; label: string }[] = [{ id: 'heap', label: 'Heap' }, { id: 'stack', label: 'Call stack' }, { id: 'watch', label: 'Watch' }, { id: 'findings', label: 'Findings' }];
@@ -29,6 +31,9 @@ export function Replay({ trace, breakpoints, onToggleBreakpoint, watches, onAddW
   const found = (trace.diagnostics ?? []).filter((d) => d.severity === 'error').length;
   // Findings opens by itself when the recording has problems; otherwise Heap is open by default.
   const shown: TabId | 'closed' = tab ?? (trace.diagnostics?.length ? 'findings' : 'heap');
+  const nullWord = /g\+\+|gcc|clang|c\+\+/i.test(trace.runtime.implementation) ? 'null' : 'None';
+  const prevEvent = p.index > 0 ? trace.events[p.index - 1] : undefined;
+  const summary = useMemo(() => (event ? describeStep(prevEvent, event, nullWord, lines) : null), [prevEvent, event, nullWord, lines]);
   const atEnd = !trace.events.length || p.index === trace.events.length - 1;
   return <><div className="replay-root"><div className={`run-status ${trace.status === 'ok' && !found ? '' : 'warning'}`}>{found > 0 && <b className="overall" data-testid="overall">Problems found: {found} {found === 1 ? 'error' : 'errors'}. See Findings below.</b>}<b>Recorded run: {trace.status}</b><span>{limitText(trace.limit_hit) ? `Capture ended early. ${limitText(trace.limit_hit)} ` : `${statusMeaning[trace.status]}. `}{trace.complete ? 'Final record captured.' : 'Incomplete capture.'}{found > 0 && trace.status === 'ok' ? ' This only says the recording finished. It does not mean the program is correct.' : ''}</span><small>{trace.runtime.implementation} {trace.runtime.version}{trace.error ? ` · ${trace.error.type}${trace.error.line ? ` on line ${trace.error.line}` : ''}` : ''}</small></div>
     <div className="sticky-bar">
@@ -38,14 +43,15 @@ export function Replay({ trace, breakpoints, onToggleBreakpoint, watches, onAddW
     </div>
     <div className="replay-grid">
       <div className="col-left">
-        {event && <Source lines={lines} line={event.line} kind={event.event} breakpoints={breakpoints} onToggleBreakpoint={onToggleBreakpoint}/>}
+        {event && <Source lines={lines} line={event.line} ranLine={summary?.ranLine} kind={event.event} breakpoints={breakpoints} onToggleBreakpoint={onToggleBreakpoint}/>}
+        {summary && <WhatChanged summary={summary}/>}
         <section className="panel output"><h2>Captured output <small>{atEnd ? 'final record, if available' : 'at this snapshot'}</small></h2>
         {(trace.stdout === undefined || trace.stderr === undefined) && <p className="warning">Final output is missing. At the end, the last checkpoint is shown and may lag.</p>}
         <div className="output-grid">{(['stdout', 'stderr'] as const).map((stream) => <div key={stream}><h3>{stream}</h3><pre data-testid={stream}>{outputAt(trace, p.index, stream) || '(empty)'}</pre></div>)}</div>
         </section>
       </div>
       <div className={`col-right ${shown === 'closed' ? 'closed' : ''}`}>
-        {event && <Structures nullWord={/g\+\+|gcc|clang|c\+\+/i.test(trace.runtime.implementation) ? 'null' : 'None'} scene={scenes.get(p.index)} event={event} prev={trace.events[p.index - 1]} prevScene={scenes.get(p.index - 1)}/>}
+        {event && <Structures nullWord={nullWord} scene={scenes.get(p.index)} event={event} prev={trace.events[p.index - 1]} prevScene={scenes.get(p.index - 1)}/>}
         <section className="panel tabs-panel" aria-label="Details">
           <div className="tabs" role="tablist" aria-label="Details panels">
             {TABS.map((t) => <button type="button" role="tab" key={t.id} id={`tab-${t.id}`} aria-selected={shown === t.id} aria-controls="tabpanel" className={`tab ${shown === t.id ? 'on' : ''}`} onClick={() => setTab(shown === t.id ? 'closed' : t.id)}>{t.label}{t.id === 'findings' && found > 0 && <span className="badge" aria-label={`${found} errors`}>{found}</span>}</button>)}
