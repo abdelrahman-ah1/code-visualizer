@@ -1,105 +1,78 @@
-# Week 1: prove the trace
+# Code Visualizer
 
-Your first deliverable is a trustworthy execution recording, not a polished interface.
-This pack starts Milestone 1 of your Python-first plan. It does not change your GitHub repository.
+An interactive web app that records the execution of unmodified **Python** or **C++** source and replays it step by step: stack frames, variables, heap objects, references, and data structures (linked lists, arrays, trees, graphs).
 
-## Start here, about 20 minutes
+Status: Milestones 1 to 6 are done. See `plan.md` for the roadmap.
 
-1. Unzip this folder and open it in your editor.
-2. Use **CPython 3.12** as the project baseline. No third-party Python packages are required.
-3. Run these commands from this folder. On Windows, replace `python3.12` with `py -3.12`.
+> **Local use only, trusted programs only.** Traced code runs as your OS user and can read files and use the network. A separate process, resource limits and a temporary working directory are not a sandbox. Do not expose the backend publicly or run other people's code. C++ programs are run twice (once under gdb, once natively with sanitizers), so do not run programs that are unsafe to run twice.
+
+## How it works
+
+```text
+React + TypeScript UI  ->  FastAPI backend (127.0.0.1)  ->  Python tracer (sys.settrace)
+                                                         ->  C++ tracer (g++ -g, then gdb)
+                              |
+                    versioned trace JSON (codeviz.trace/1.0)
+                              |
+                  browser replay engine and visualization
+```
+
+Replay happens entirely in the browser from saved snapshots. Stepping back never re-runs your program and cannot undo file or network effects.
+
+## Quick start
+
+Requirements: Python 3.12, Node 22.12 or newer. For C++ also `g++` and `gdb` (Linux verified; on Windows use WSL, see `WSL_SETUP.md`).
 
 ```sh
-python3.12 --version
-python3.12 -m unittest -v
+# Backend, from the repository root
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
+```
+
+```sh
+# Frontend, in a second terminal
+cd frontend
+npm ci
+npm run dev        # open http://127.0.0.1:5173
+```
+
+You can also trace a Python file from the command line without any server:
+
+```sh
 python3.12 trace_capture.py fixtures/05_alias.py -o alias.trace.json
 ```
 
-The tests should finish with `OK`. The last command should say `ok`.
-Open `alias.trace.json`. In its last event, `a` and `b` must point to the same object ID.
-That object's items must be 1 and 2. This is your first acceptance check.
-
-Do not start React yet. First explain why the event on line 3 contains `[1]`, while the final return event contains `[1, 2]`.
-
-## Seven work sessions
-
-These are proposed work sessions, not calendar deadlines. Budget roughly 60 to 90 minutes each; split them if coursework gets busy. The starter code is already supplied, so use the time to understand, verify and improve it rather than retype it.
-
-| Session | Work | Finish when |
-|---|---|---|
-| 1. Run one trace | Run the commands above. Read `trace_capture.py`, then follow fixture 05 by hand. Write five sentences describing parent, worker, event and object IDs. | You can point to the exact alias edge in JSON and explain line timing. |
-| 2. Freeze the contract | Read `TRACE_FORMAT.md`. Inspect scalar and loop fixtures. Decide to keep schema `codeviz.trace/1.0` for this week. | You can predict every loop-body event and distinguish next-line state from completed-line state. |
-| 3. Check stack frames | Follow factorial calls and returns in fixture 03. Inspect arguments, local `partial` and the module's `answer`. | The call arguments are 3, 2, 1, the returns are 1, 2, 6, and the deepest stack has four frames including the module. |
-| 4. Check graph identity | Compare fixtures 04, 05, 06 and 07. Draw boxes and arrows on paper. | Mutation keeps an ID; aliasing shares one ID; a shallow copy gets a new outer ID; a cycle points back to itself. |
-| 5. Check failures | Run fixtures 08 to 10. Run the event-limit and output-limit checks. Try a syntax error. | You never display a timeout or truncated run as successful completion. A caught exception is not automatically a failed run. |
-| 6. Add your own proof | Add a linked-list insertion example and an independent expected-state test. Add a dictionary mutation test. | Your new tests assert values and edges, not just that JSON exists. Do not overwrite the ten baseline expectations. |
-| 7. Gate review | Run all tests again. Record your exact interpreter version. Explain the ten fixtures without reading the expected files first. Record a two-minute terminal walkthrough. | All ten baseline cases and the extra checks pass, you can explain the snapshots, and known limits are written down. Only then start Week 2 replay UI. |
-
-## What is in the pack
-
-- `trace_capture.py`: public Python API and CLI; launches a fresh worker, sets a wall timeout, reads partial event records and returns one versioned JSON document.
-- `worker.py`: `sys.settrace` hook, bounded stdout/stderr, graph snapshots, stable run-local object IDs and best-effort Unix resource limits.
-- `fixtures/`: ten tiny programs, each beside a hand-written `.expected.json` file.
-- `test_trace.py`: assertions for all ten programs, plus twelve extra edge scenarios.
-- `examples/`: traces actually generated by the tests on CPython 3.12.16. Do not compare entire files byte for byte across Python versions.
-- `TRACE_FORMAT.md`: event semantics and schema rules.
-- `HAND_CHECKS.md`: the ten programs and the states you should predict.
-- `TEST_REPORT.md`: execution results and remaining limits.
-- `test-results*.txt`: actual test runner output.
-- `make_fixtures.py`: regenerates the supplied baseline fixtures. Do not run it after editing those fixtures unless you want to reset them.
-
-## Useful commands
+## Tests
 
 ```sh
-# Scalars
-python3.12 trace_capture.py fixtures/01_scalars.py -o trace.json
-
-# Fixed input, no interactive worker prompt
-python3.12 -c "from pathlib import Path; Path('input.txt').write_text('Ada\n')"
-python3.12 trace_capture.py fixtures/08_stdout_input.py --stdin-file input.txt -o input.trace.json
-
-# Partial trace followed by timeout; exit code 1 is expected
-python3.12 trace_capture.py fixtures/10_timeout.py --timeout 0.5 -o timeout.trace.json
-
-# Import from another local Python file
-# from trace_capture import capture
-# trace = capture('a = [1]\nb = a\nb.append(2)\n')
+pip install pytest
+python -m pytest -q test_trace.py backend/tests     # tracers, API, C++ (needs g++ and gdb)
+cd frontend && npx tsc --noEmit && npx vitest run   # types and unit tests
+cd frontend && npx playwright test                  # browser tests
 ```
 
-The CLI returns 0 for `ok`, 1 for all other execution statuses. Invalid CLI arguments or unreadable files are launcher errors rather than visualized-program errors.
+CI (`.github/workflows/ci.yml`) runs all of these on every push and pull request.
 
-## Keep the scope small
+## Repository map
 
-This is a **local development prototype for your own trusted programs**. A separate process, `-I`, a temporary working directory and resource limits are not a secure sandbox. Programs still run as your OS user and can access files and the network. Do not put this behind a public Run button or accept other people's code. Do not run it with credentials or valuable files available.
+| Path | Contents |
+|---|---|
+| `trace_capture.py`, `worker.py` | Python tracer: launcher/CLI and the `sys.settrace` worker |
+| `cpp_trace.py`, `cpp_gdb_worker.py` | C++ tracer: compile, sanitizer run, and gdb stepping worker |
+| `backend/` | FastAPI app, example programs, backend tests and C++ test programs |
+| `frontend/` | Vite + React 19 + TypeScript replay UI, with unit and browser tests |
+| `fixtures/`, `examples/` | Baseline Python programs with hand-written expected traces, and generated traces |
+| `test_trace.py` | Tests for the baseline fixtures and edge scenarios |
 
-No C++, web server, login, AI explanations, graph animation or real interpreter rewind this week. Previous/next later will replay saved snapshots. It will not undo file writes or network effects.
+## Documentation
 
-## Reference docs
-
-- Python trace events: https://docs.python.org/3.12/library/sys.html#sys.settrace
-- Process launcher and timeout: https://docs.python.org/3.12/library/subprocess.html
-- Unix resource limits: https://docs.python.org/3.12/library/resource.html
-
-Your earlier project plan remains the high-level scope. This pack implements its first gate only.
-
-
-## Measured performance (local, one machine, 1 core; see the notes for what each number is)
-
-Baseline is commit 3bee74b. "p95" is the 95th percentile of the runs listed. Chrome numbers are the JS heap after load over an empty page, forced GC, production build (`vite build` + preview). These are one machine's numbers, not guarantees.
-
-| What | Before | After | Runs |
-| --- | --- | --- | --- |
-| Python, 1,806-event loop: server capture | 67 ms | 60 ms (66 ms with the compact form) | 20, median; p95 62 (plain), 71 (compact) |
-| Python print-heavy: server capture | 33 ms | 25 ms (20 ms compact) | 20, median |
-| Run response, 1,806-event loop | 3.59 MB | 0.57 MB compact (gzip 0.036 → 0.026 MB) | 1 |
-| Run response, print-heavy | 1.99 MB | 0.11 MB | 1 |
-| Chrome heap, 1,806-event loop | 5.33 MB | 3.37 MB | 3, no spread |
-| Chrome heap, print-heavy (453 events) | 2.94 MB | 1.13 MB | 3 |
-| Click to first frame, 1,806-event loop (production build, patched tree only) | not measured on baseline | 252-286 ms: 35-51 ms before the request, first byte 135-169 ms (capture about 60 ms), about 100-113 ms parse and draw after the response | 5 |
-| Far seeks in Chrome | about 34 ms | about 34 ms (60 Hz frame floor) | 8 per run |
-| C++ Huffman (278 events): cold / warm median / warm p95 | 1,716 / 1,681 / 1,790 ms | 1,106 / 1,099 / 1,182 ms | 10 runs, n=9 warm |
-| C++ hashtree (198 events) | 679 / 692 / 714 ms | 659 / 653 / 694 ms | 10 runs |
-| 10,000-event compact file (synthetic: one 40-item list whose length grows), first frame | 2,020 ms (plain, 19.2 MB) | 303 ms (compact, 1.4 MB) | 2 |
-| Same file, Chrome heap | 17.9-18.2 MB | 6.7 MB | 2 |
-
-Things these numbers do not show: the compact form shrinks gzip transfer very little (gzip already removes the repetition), the 10,000-event row is a best case for the delta encoding, Windows, Safari and Edge are untested, and CI (`.github/workflows/ci.yml`) has not been run on GitHub.
+- `TRACE_FORMAT.md`: trace event semantics and schema rules (the contract between tracer and UI)
+- `CPP_LIMITS.md`: what C++ support covers and what it does not
+- `backend/README.md`: API, limits and error codes
+- `frontend/README.md`: frontend setup and design
+- `HAND_CHECKS.md`: the baseline programs and the states to predict by hand
+- `WSL_SETUP.md`: running C++ on Windows
+- `TEST_REPORT*.md`, `WALKTHROUGH*.md`, `frontend/PERF_REPORT.md`: per-milestone evidence and walkthroughs
+- `plan.md`: roadmap. `agent.md`: guide for coding agents.
