@@ -135,3 +135,12 @@ Recordings may be stored with `"encoding": "node-pool/1"`, `"node-pool/2"` or `"
 - `node-pool/3`: a pool entry may be `{"delta_of": earlierIndex, "set": {field: value}, "append": [items]}`: the earlier entry with those top-level fields replaced and items added at the end. `items` is never replaced, only appended to.
 
 The viewer bounds what a compact file may expand to by the same 20 MiB limit as a plain file (each rebuilt entry counts its full JSON size), and refuses bad indexes, forward or unknown delta bases, unknown delta fields and more than 10,000 events. The Run button asks the backend for the compact form (Python only); "Save recording" always writes the plain 1.0 shape, "Save compact" and the offline export write `node-pool/2`.
+
+## Access marks (`accesses`, optional, Python)
+
+An event may carry `"accesses": [{"id", "mode", "line", "cell" | "key"}]`: the elements the source line of that step touched. `mode` is `read`, `write` or `readwrite`; `id` is a heap id captured in the same event; `cell` is a list index, `key` a dict key. Recordings made before this field open as before.
+
+- A Python `line` event fires before its line runs, so the accesses a line performs are known only after the next event starts. They are stored in a side file keyed by step and merged onto the event of the line that performed them. A run killed on a line keeps the marks of every earlier line, not of the line it was killed on.
+- At most 8 per event (the last 8 are kept). Objects the recording did not capture get no mark. Booleans as indices get no mark.
+- Marked: `v[i]` reads, `v[i] = x`, `v[i] += x`, and `for x in seq` over a bare name (one read per iteration; a dict gives the key). Not marked (false negatives): slices, `del`, chained assignment, comprehensions, attributes, `for x in <expression>`, strings and sets.
+- The renderer draws at most two rings per step; the lane summary lists them all.
