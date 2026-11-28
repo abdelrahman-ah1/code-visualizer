@@ -3,6 +3,7 @@ import type { TraceEvent } from '../types';
 import { CARD, GEOM, REC, arrayOmitted, cardRows, portY, cellCentre, accessTargets, accessClause, changedBetween, fmt, laneSummary, linkFieldsByType, linkPath, recGeom, graphSpec, vertexCutOff, vertexDisplay, vertexEdges } from '../structures';
 import type { Link, Scene } from '../structures';
 import type { Value } from '../types';
+import { FRAMES_W, FramesColumn, layoutFrames } from './Frames';
 
 // Draws one Scene. Layout comes from structures.ts. This file only turns boxes and arrows into SVG.
 // Each box sits in its own <g> whose CSS transform is animated, so a box slides when its position changes.
@@ -35,10 +36,15 @@ function Pointer({ name, value, x, y, drawn, nullWord, strip }: { name: string; 
 const ORPHAN_HINT = 'Not reachable through the captured roots at this step: no captured local, global, file-level static or top-level function-static leads to this block, directly or through other blocks. It is still allocated, so this is not a leak report. Statics in nested blocks or lambdas, thread-locals, registers and unmanaged buffers are not captured.';
 export const Structures = memo(function Structures({ scene, event, prev, prevScene, nullWord = 'None' }: { scene: Scene; event: TraceEvent; prev?: TraceEvent; prevScene?: Scene; nullWord?: string }) {
   const [zoom, setZoom] = useState(1), box = useRef<HTMLDivElement>(null), drag = useRef<{ x: number; y: number; l: number; t: number } | null>(null);
+  // Visualization plan A1: the frames column (variables with arrows into the diagram). On by default; the reader can hide it.
+  const [showVars, setShowVars] = useState(true);
+  const frameLayout = useMemo(() => layoutFrames(event), [event]);
+  const withVars = showVars && event.frames.length > 0, offX = withVars ? FRAMES_W : 0;
+  const totalW = scene.width + offX, totalH = Math.max(scene.height, withVars ? frameLayout.height + 10 : 0);
   const userZoom = useRef(false);   // once the reader sets a zoom, the panel stops fitting scenes for them
   const setZ = (z: number) => { userZoom.current = true; setZoom(Math.min(2.5, Math.max(0.2, Math.round(z * 100) / 100))); };
   const pan = (dx: number, dy: number) => box.current?.scrollBy({ left: dx, top: dy, behavior: 'smooth' });
-  const fit = () => { const el = box.current; if (el) setZ(Math.min(1.5, (el.clientWidth - 12) / scene.width, (el.clientHeight - 12) / scene.height)); el?.scrollTo({ left: 0, top: 0 }); };
+  const fit = () => { const el = box.current; if (el) setZ(Math.min(1.5, (el.clientWidth - 12) / totalW, (el.clientHeight - 12) / totalH)); el?.scrollTo({ left: 0, top: 0 }); };
   const { changed } = useMemo(() => changedBetween(prev, event), [prev, event]);
   const linkField = useMemo(() => linkFieldsByType(event.heap), [event]);
   const summaries = scene.lanes.map((lane) => laneSummary(lane, event, scene));
@@ -68,6 +74,8 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
     // Fit to the boxes, not to the canvas: the canvas is a little taller when a step routes an arrow below the last
     // row, and letting that overhang zoom the whole picture out would shrink every node for one long arrow.
     const boxesBottom = Math.max(0, ...Object.values(scene.boxes).map((b) => b.y + b.h)) + 40;
+    // Fitted to the structures only, as before the frames column existed: a call, a return or a growing list must not
+    // rescale the whole picture under the reader. The column may then need a sideways pan; "Fit all" includes it.
     const k = Math.min((el.clientWidth - 12) / scene.width, (el.clientHeight - 12) / Math.min(scene.height, boxesBottom), 1);
     setZoom(k < 0.95 ? Math.min(1, Math.max(0.45, Math.round(k * 100) / 100)) : 1);
   }, [scene.width, scene.height]);
@@ -139,15 +147,16 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
       <div className="zoom-bar" role="group" aria-label="Zoom and pan the diagram">
         <button type="button" aria-label="Pan left" onClick={() => pan(-240, 0)}>←</button><button type="button" aria-label="Pan up" onClick={() => pan(0, -160)}>↑</button><button type="button" aria-label="Pan down" onClick={() => pan(0, 160)}>↓</button><button type="button" aria-label="Pan right" onClick={() => pan(240, 0)}>→</button>
         <button type="button" aria-label="Zoom out" onClick={() => setZ(zoom / 1.25)}>−</button><output data-testid="zoom-level">{Math.round(zoom * 100)}%</output><button type="button" aria-label="Zoom in" onClick={() => setZ(zoom * 1.25)}>+</button>
-        <button type="button" onClick={fit}>Fit all</button><button type="button" onClick={() => setZ(1)}>100%</button></div></div>
+        <button type="button" aria-pressed={showVars} data-testid="toggle-vars" title="Show or hide the stack frames and their arrows" onClick={() => setShowVars(!showVars)}>Variables</button><button type="button" onClick={fit}>Fit all</button><button type="button" onClick={() => setZ(1)}>100%</button></div></div>
     <ul className="sr-only" data-testid="lane-summaries">{summaries.map((s, i) => <li key={i}>{s}</li>)}</ul>
     {!scene.lanes.length && !scene.cards.length && !adjGroups.length && <p className="empty" data-testid="structures-empty">No linked-list nodes or arrays at this snapshot.{scene.nulls.length > 0 && ` ${nullWord}: ${scene.nulls.join(', ')}.`}</p>}
-    {(scene.lanes.length > 0 || scene.cards.length > 0 || adjGroups.length > 0) && <div className="structure-scroll" ref={box} tabIndex={0} role="group" aria-label="Structure diagram. Drag, use arrow keys or the pan buttons to move; zoom with the buttons"
+    {(scene.lanes.length > 0 || scene.cards.length > 0 || adjGroups.length > 0 || withVars) && <div className="structure-scroll" ref={box} tabIndex={0} role="group" aria-label="Structure diagram. Drag, use arrow keys or the pan buttons to move; zoom with the buttons"
       onPointerDown={(e) => { if (e.button === 0 && box.current) drag.current = { x: e.clientX, y: e.clientY, l: box.current.scrollLeft, t: box.current.scrollTop }; }}
       onPointerMove={(e) => { const d = drag.current; if (d && box.current && e.buttons === 1) box.current.scrollTo({ left: d.l - (e.clientX - d.x), top: d.t - (e.clientY - d.y) }); }}
       onPointerUp={() => { drag.current = null; }} onPointerLeave={() => { drag.current = null; }}>
-      <svg width={Math.ceil(scene.width * zoom)} height={Math.ceil(scene.height * zoom)} viewBox={`0 0 ${scene.width} ${scene.height}`} role="img" aria-label={summaries.join('. ')} data-testid="structure-svg" data-zoom={zoom}>
-        <defs><marker id="cv-arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" className="arrowhead"/></marker><marker id="cv-arrowhead-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" className="arrowhead-muted"/></marker></defs>
+      <svg width={Math.ceil(totalW * zoom)} height={Math.ceil(totalH * zoom)} viewBox={`0 0 ${totalW} ${totalH}`} role="img" aria-label={summaries.join('. ')} data-testid="structure-svg" data-zoom={zoom}>
+        <defs><marker id="cv-arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" className="arrowhead"/></marker><marker id="cv-arrowhead-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" className="arrowhead-muted"/></marker><marker id="cv-var-head" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10z" className="var-head"/></marker><marker id="cv-var-head-quiet" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10z" className="var-head quiet"/></marker></defs>
+        <g className="heap-area" transform={offX ? `translate(${offX} 0)` : undefined}>
         {scene.cards.map((id) => {
           const b = scene.boxes[id], node = event.heap[id], tag = scene.tags[id], m = mark(id);
           if (b.vertex) return renderVertex(id, b, node, tag, m);
@@ -223,6 +232,8 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
             {g.vertices.map((id) => renderAdjVertex(id, g))}
           </g>;
         })}
+        </g>
+        {withVars && <FramesColumn event={event} prev={prev} scene={scene} nullWord={nullWord}/>}
       </svg></div>}
     {(scene.lanes.length > 0 || scene.cards.length > 0) && scene.nulls.length > 0 && <p className="hint">{nullWord}: {scene.nulls.join(', ')}</p>}
     {Object.values(event.heap).some((n) => n.orphan && !n.freed) && <p className="hint" data-testid="orphan-legend">Dashed outline, "unreferenced": {ORPHAN_HINT}</p>}
