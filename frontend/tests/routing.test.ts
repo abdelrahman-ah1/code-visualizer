@@ -89,12 +89,15 @@ export function crossings(scene: Scene): { arrows: number; crossing: number; wor
 }
 const dir = new URL('../public/examples/', import.meta.url);
 const names = readdirSync(dir).filter((f) => f.endsWith('.trace.json'));
+// CI runners are about three times slower than this machine, and these walk every scene of every recording,
+// so they get an explicit timeout instead of vitest's 5 s default.
+const SLOW = 120_000;
 describe('arrow routing', () => {
   it('reports arrows over other boxes' + "'" + ' name pills and captions', () => {
     let arrows = 0, hits = 0;
     for (const n of names) for (const s of buildScenes(parseTrace(readFileSync(new URL(n, dir), 'utf8')))) { const c = crossings(s); arrows += c.arrows; hits += c.labelHits; }
     console.log('label hits over all examples/events', hits, 'of', arrows, 'arrows');
-  });
+  }, SLOW);
   for (const n of names) it(`${n}: sceneCache (routes only the scene shown) draws the same arrows as buildScenes, far seek first`, () => {
     const t = parseTrace(readFileSync(new URL(n, dir), 'utf8')), all = buildScenes(t), c = sceneCache(t);
     const sig = (s: any) => JSON.stringify([s.width, s.height, s.links.map((l: any) => linkPath(l, s.boxes))]);
@@ -109,7 +112,7 @@ describe('arrow routing', () => {
   it.skipIf(!big)('large capture (CODEVIZ_ROUTE_TRACE): final scenes have no crossings', () => {
     const scenes = buildScenes(parseTrace(readFileSync(big!, 'utf8')));
     for (const i of [scenes.length - 1, Math.min(1165, scenes.length - 1)]) { const c = crossings(scenes[i]); console.log('event', i, JSON.stringify(c)); expect(c.crossing).toBe(0); expect(c.labelHits).toBe(0); expect(c.shared).toBe(0); }
-  });
+  }, SLOW);
 });
 
 // The six acceptance programs he chose, with the numbers this slice started from (main 471bee9). A later change may
@@ -135,5 +138,5 @@ describe('acceptance programs: every arrow inside the frame, none worse than the
     expect(c).toBeLessThanOrEqual(cross);
     expect(l).toBeLessThanOrEqual(lo);
     expect(d).toBeLessThanOrEqual(detour);
-  });
+  }, SLOW);
 });
