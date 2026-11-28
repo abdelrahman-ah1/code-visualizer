@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { TraceEvent } from '../types';
-import { CARD, GEOM, REC, arrayOmitted, cardRows, portY, cellCentre, accessTargets, changedBetween, fmt, laneSummary, linkFieldsByType, linkPath, recGeom, graphSpec, vertexCutOff, vertexDisplay, vertexEdges } from '../structures';
+import { CARD, GEOM, REC, arrayOmitted, cardRows, portY, cellCentre, accessTargets, accessClause, changedBetween, fmt, laneSummary, linkFieldsByType, linkPath, recGeom, graphSpec, vertexCutOff, vertexDisplay, vertexEdges } from '../structures';
 import type { Link, Scene } from '../structures';
 import type { Value } from '../types';
 
@@ -46,6 +46,14 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
   // write, dashed when the tracer only knew the line. The changed-object flash keeps the colour job; the ring is shape.
   const rings = useMemo(() => accessTargets(scene, event), [scene, event]);
   const ringAt = (id: string, cell: number) => rings.find((r) => r.id === id && r.cell === cell);
+  // A ring on a card row or a record line: the rectangle around it, thin for a read, thicker with an arrow-in for a write (on the left of a row, on top of a whole node).
+  const ringBox = (r: { id: string; mode: string; exact: boolean }, at: { x: number; y: number; w: number; h: number }, name: string, top = false) => {
+    const w = r.mode !== 'read' ? 3.8 : 2.2, pad = w / 2;
+    return <g className="access" data-testid={`access-ring-${r.id}-${name}`} data-mode={r.mode} data-exact={r.exact ? 'yes' : 'no'}>
+      <rect className={`access-ring${r.mode !== 'read' ? ' strong' : ''}${r.exact ? '' : ' guess'}`} x={at.x - pad} y={at.y - pad} width={at.w + w} height={at.h + w} rx={4} strokeWidth={w}/>
+      {r.mode !== 'read' && <path className="access-in" d={top ? `M ${at.x + at.w / 2 - 5} ${at.y - 13} L ${at.x + at.w / 2 + 5} ${at.y - 13} L ${at.x + at.w / 2} ${at.y - 6} Z` : `M ${at.x - 14} ${at.y + at.h / 2 - 5} L ${at.x - 14} ${at.y + at.h / 2 + 5} L ${at.x - 7} ${at.y + at.h / 2} Z`}/>}
+    </g>;
+  };
   const linksFrom = (id: string) => scene.links.filter((l) => l.from === id);
   const mark = (id: string) => (prevScene && !prevScene.boxes[id] ? 'enter' : changed.has(id) ? 'changed' : '');
   // The arrows that touch what this step changed stay in the accent colour; the rest go quiet, so one step reads as one path.
@@ -70,7 +78,7 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
     const drawn = (v: Value) => v.kind === 'ref' && !!scene.boxes[v.id];
     const arrows = linksFrom(id).map((l) => { const d = linkPath(l, scene.boxes); return d && <path key={`${l.cell ?? 'n'}>${l.to}${l.port ? 'p' : ''}`} className={arrowCls(l)} data-from={l.from} data-to={l.to} d={d} markerEnd={arrowHead(l)}/>; });
     return <g key={id} className="vnode" data-testid={`box-${id}`} data-x={b.x} data-y={b.y} style={{ transform: `translate(${b.x}px, ${b.y}px)` }}>
-      <title>{`${node.type} ${id}${node.address ? ` at ${node.address}` : ''}: ${Object.entries(node.fields ?? {}).map(([k, v]) => `${k}=${v.kind === 'ref' ? v.id : fmt(v, 20)}`).join(', ')}`}</title>
+      <title>{`${node.type} ${id}${node.address ? ` at ${node.address}` : ''}${accessClause({ ids: [id] }, event)}: ${Object.entries(node.fields ?? {}).map(([k, v]) => `${k}=${v.kind === 'ref' ? v.id : fmt(v, 20)}`).join(', ')}`}</title>
       {tag && <Tag names={tag}/>}
       <g key={m ? `${m}${event.step}` : 's'} className={m}>
         <rect className={`node-box${node.orphan ? ' orphan' : ''}`} width={b.w} height={g.mainH} rx="10"/>
@@ -78,6 +86,7 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
         {sp.main && <text className="node-main" x={mid} y={mainY} textAnchor="middle"><title>{`${sp.main[0]}: ${String(sp.main[1].kind === 'scalar' ? sp.main[1].value : '')}`}</title>{mainText}</text>}
         {sp.rest.map(([k, v], i) => <text className="node-rest" key={k} x={mid} y={mainY + 15 + i * REC.line} textAnchor="middle" data-testid="data-line"><title>{`${k}: ${v.kind === 'scalar' ? String(v.value) : v.kind}`}</title>{`${k}: ${clipText(fmtData(v), 7)}`}</text>)}
         {sp.moreData > 0 && <text className="node-rest" x={mid} y={mainY + 15 + sp.rest.length * REC.line} textAnchor="middle">{`+${sp.moreData} more`}</text>}
+        {rings.filter((r) => r.id === id && r.field !== undefined).map((r) => <g key="node">{ringBox(r, { x: 0, y: 0, w: b.w, h: b.h }, 'node', true)}</g>)}
         {sp.side && <Pointer name={sp.side[0]} value={sp.side[1]} x={mainW + REC.ptrW / 2} y={g.mainH / 2 + 4} drawn={drawn(sp.side[1])} nullWord={nullWord} strip={false}/>}
         {sp.under.map(([k, v], i) => <g key={k} transform={`translate(0 ${g.mainH + i * REC.strip})`}>
           <rect className="node-box ptr-strip" width={b.w} height={REC.strip} rx="6"/>
@@ -145,7 +154,7 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
           if (b.rec) return renderRecord(id, b, node, tag, m);
           const rows = cardRows(node);
           return <g key={id} className="vnode" data-testid={`box-${id}`} data-x={b.x} data-y={b.y} style={{ transform: `translate(${b.x}px, ${b.y}px)` }}>
-            <title>{`${node.type} ${id}${node.address ? ` at ${node.address}` : ''}${node.freed ? ' (freed)' : ''}`}</title>
+            <title>{`${node.type} ${id}${node.address ? ` at ${node.address}` : ''}${node.freed ? ' (freed)' : ''}${accessClause({ ids: [id] }, event)}`}</title>
             {tag && <Tag names={tag}/>}
             <g key={m ? `${m}${event.step}` : 's'} className={m}>
               <rect className={`node-box card-box${node.freed ? ' freed' : ''}`} width={b.w} height={b.h} rx="8"/>
@@ -155,6 +164,7 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
                 return <g key={i} className="card-row"><title>{`${r.label ? r.label + ": " : ""}${r.value ? (r.value.kind === "ref" ? `-> ${r.value.id}` : r.value.kind === "scalar" ? (r.value.value === null ? nullWord : String(r.value.value)) : r.value.kind) : r.note ?? ""}`}</title><text className="card-label" x="8" y={portY(i) + 4}>{clipText(r.label, 7)}</text>
                   <text className={`card-value${r.note ? ' note' : ''}`} x={b.w - (isRef ? 22 : 10)} y={portY(i) + 4} textAnchor="end">{isRef && !ok ? `${(r.value as { id: string }).id} missing` : isRef ? (r.value as { id: string }).id : cardText(r.value, nullWord, r.note)}</text>
                   {ok && <circle className="node-dot" cx={b.w - 10} cy={portY(i)} r="3.5"/>}</g>; })}
+              {rings.filter((r) => r.id === id && r.row !== undefined).map((r) => <g key={r.row}>{ringBox(r, { x: 3, y: portY(r.row!) - CARD.row / 2 + 1, w: b.w - 6, h: CARD.row - 2 }, `row${r.row}`)}</g>)}
             </g>
             {linksFrom(id).map((l) => { const d = linkPath(l, scene.boxes); return d && <path key={`${l.cell}>${l.to}`} className={arrowCls(l)} data-from={l.from} data-to={l.to} d={d} markerEnd={arrowHead(l)}/>; })}
           </g>;
@@ -175,13 +185,13 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
                 const arrowed = v.kind === 'ref' && scene.boxes[v.id];
                 // Only the cells whose value differs get the flash, not the whole array.
                 const cm = m === 'enter' ? 'enter' : m === 'changed' && JSON.stringify(prev?.heap[id]?.items?.[i]) !== JSON.stringify(v) ? 'changed' : '';
-                const ring = ringAt(id, i), ringW = ring && ring.mode !== 'read' ? 3.4 : 1.6, ringPad = 1 + ringW / 2;
+                const ring = ringAt(id, i), ringW = ring && ring.mode !== 'read' ? 4.2 : 2.2, ringPad = 1 + ringW / 2;
                 return <g key={i} className="cell"><g key={cm ? `${cm}${event.step}` : 's'} className={cm}>
                   <rect className="cell-box" x={cx(i)} y={cy(i)} width={GEOM.cell} height={GEOM.cell}/>
                   <text className="cell-value" x={cx(i) + GEOM.cell / 2} y={cy(i) + GEOM.cell / 2 + 4} textAnchor="middle">{arrowed ? '•' : fmt(v, 5)}</text></g>
                   {ring && <g className="access" data-testid={`access-ring-${id}-${i}`} data-mode={ring.mode} data-exact={ring.exact ? 'yes' : 'no'}>
-                    <rect className={`access-ring${ring.exact ? '' : ' guess'}`} x={cx(i) - ringPad} y={cy(i) - ringPad} width={GEOM.cell + ringPad * 2} height={GEOM.cell + ringPad * 2} rx={4} strokeWidth={ringW}/>
-                    {ring.mode !== 'read' && <path className="access-in" d={`M ${cx(i) + GEOM.cell / 2 - 4.5} ${cy(i) - 7} L ${cx(i) + GEOM.cell / 2 + 4.5} ${cy(i) - 7} L ${cx(i) + GEOM.cell / 2} ${cy(i) - 1.5} Z`}/>}
+                    <rect className={`access-ring${ring.mode !== 'read' ? ' strong' : ''}${ring.exact ? '' : ' guess'}`} x={cx(i) - ringPad} y={cy(i) - ringPad} width={GEOM.cell + ringPad * 2} height={GEOM.cell + ringPad * 2} rx={4} strokeWidth={ringW}/>
+                    {ring.mode !== 'read' && <path className="access-in" d={`M ${cx(i) + GEOM.cell / 2 - 5} ${cy(i) - 13} L ${cx(i) + GEOM.cell / 2 + 5} ${cy(i) - 13} L ${cx(i) + GEOM.cell / 2} ${cy(i) - 6} Z`}/>}
                   </g>}
                   {box.stack
                     ? <text className="cell-index" x={-8} y={cy(i) + GEOM.cell / 2 + 4} textAnchor="end">{i}</text>
