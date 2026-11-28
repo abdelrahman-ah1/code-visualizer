@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { TraceEvent } from '../types';
-import { CARD, GEOM, REC, arrayOmitted, cardRows, portY, cellCentre, changedBetween, fmt, laneSummary, linkFieldsByType, linkPath, recGeom, graphSpec, vertexCutOff, vertexDisplay, vertexEdges } from '../structures';
+import { CARD, GEOM, REC, arrayOmitted, cardRows, portY, cellCentre, accessTargets, changedBetween, fmt, laneSummary, linkFieldsByType, linkPath, recGeom, graphSpec, vertexCutOff, vertexDisplay, vertexEdges } from '../structures';
 import type { Link, Scene } from '../structures';
 import type { Value } from '../types';
 
@@ -42,6 +42,10 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
   const { changed } = useMemo(() => changedBetween(prev, event), [prev, event]);
   const linkField = useMemo(() => linkFieldsByType(event.heap), [event]);
   const summaries = scene.lanes.map((lane) => laneSummary(lane, event, scene));
+  // The elements this step's line touched, at most two of them: a thin ring for a read, a thick one with an arrow for a
+  // write, dashed when the tracer only knew the line. The changed-object flash keeps the colour job; the ring is shape.
+  const rings = useMemo(() => accessTargets(scene, event), [scene, event]);
+  const ringAt = (id: string, cell: number) => rings.find((r) => r.id === id && r.cell === cell);
   const linksFrom = (id: string) => scene.links.filter((l) => l.from === id);
   const mark = (id: string) => (prevScene && !prevScene.boxes[id] ? 'enter' : changed.has(id) ? 'changed' : '');
   // The arrows that touch what this step changed stay in the accent colour; the rest go quiet, so one step reads as one path.
@@ -171,9 +175,14 @@ export const Structures = memo(function Structures({ scene, event, prev, prevSce
                 const arrowed = v.kind === 'ref' && scene.boxes[v.id];
                 // Only the cells whose value differs get the flash, not the whole array.
                 const cm = m === 'enter' ? 'enter' : m === 'changed' && JSON.stringify(prev?.heap[id]?.items?.[i]) !== JSON.stringify(v) ? 'changed' : '';
+                const ring = ringAt(id, i), ringW = ring && ring.mode !== 'read' ? 3.4 : 1.6, ringPad = 1 + ringW / 2;
                 return <g key={i} className="cell"><g key={cm ? `${cm}${event.step}` : 's'} className={cm}>
                   <rect className="cell-box" x={cx(i)} y={cy(i)} width={GEOM.cell} height={GEOM.cell}/>
                   <text className="cell-value" x={cx(i) + GEOM.cell / 2} y={cy(i) + GEOM.cell / 2 + 4} textAnchor="middle">{arrowed ? '•' : fmt(v, 5)}</text></g>
+                  {ring && <g className="access" data-testid={`access-ring-${id}-${i}`} data-mode={ring.mode} data-exact={ring.exact ? 'yes' : 'no'}>
+                    <rect className={`access-ring${ring.exact ? '' : ' guess'}`} x={cx(i) - ringPad} y={cy(i) - ringPad} width={GEOM.cell + ringPad * 2} height={GEOM.cell + ringPad * 2} rx={4} strokeWidth={ringW}/>
+                    {ring.mode !== 'read' && <path className="access-in" d={`M ${cx(i) + GEOM.cell / 2 - 4.5} ${cy(i) - 7} L ${cx(i) + GEOM.cell / 2 + 4.5} ${cy(i) - 7} L ${cx(i) + GEOM.cell / 2} ${cy(i) - 1.5} Z`}/>}
+                  </g>}
                   {box.stack
                     ? <text className="cell-index" x={-8} y={cy(i) + GEOM.cell / 2 + 4} textAnchor="end">{i}</text>
                     : <text className="cell-index" x={cellCentre(i)} y={GEOM.cell + 13} textAnchor="middle">{i}</text>}</g>;
