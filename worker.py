@@ -164,6 +164,7 @@ def _lineno(frame):
 # The source is rewritten before it is compiled so the tracer learns which cell, row or key the code touched.
 # The helpers only note and then do exactly what the original expression did; they never change a result.
 ACCESS_CAP = 8
+_ModuleType = type(sys)
 
 
 class AccessLog:
@@ -175,7 +176,24 @@ class AccessLog:
 
     def note(self, container, index, mode, line):
         try:
-            self.items.append((id(container), index, mode, line))
+            self.items.append((id(container), index, mode, line, isinstance(container, dict)))
+            if len(self.items) > ACCESS_CAP:
+                del self.items[0]
+        except Exception:
+            pass
+
+    def note_field(self, obj, name, mode, line):
+        """obj.name: only an instance that holds the name in its own dict (or slots) has a field to point at."""
+        try:
+            if isinstance(obj, (type, _ModuleType)):
+                return
+            own = getattr(obj, "__dict__", None)
+            if own is None:
+                if name not in getattr(type(obj), "__slots__", ()):
+                    return
+            elif name not in own and mode == "read":
+                return                            # a method or class attribute: not a field of this object
+            self.items.append((id(obj), name, mode, line, "field"))
             if len(self.items) > ACCESS_CAP:
                 del self.items[0]
         except Exception:
@@ -185,14 +203,20 @@ class AccessLog:
         if not self.items:
             return None
         out = []
-        for oid, index, mode, line in self.items:
+        for oid, index, mode, line, kind in self.items:
             heap_id = ids.get(oid)
             if heap_id is None:
                 continue                      # the object was never captured: no mark, never a guess
             entry = {"id": heap_id, "mode": mode, "line": line}
-            if isinstance(index, bool):
+            if kind == "field":
+                entry["field"] = index
+            elif kind is True:                # a dict: the key itself, whatever scalar it is
+                if not (index is None or isinstance(index, (bool, int, str))):
+                    continue
+                entry["key"] = index
+            elif isinstance(index, bool):
                 continue
-            if isinstance(index, int):
+            elif isinstance(index, int):
                 entry["cell"] = index
             elif isinstance(index, str):
                 entry["key"] = index
@@ -219,6 +243,21 @@ def _cv_set(container, index, value):
 
 def _cv_aug(container, index):
     ACCESS.note(container, index, "readwrite", sys._getframe(1).f_lineno)
+
+
+def _cv_attr(obj, name):
+    ACCESS.note_field(obj, name, "read", sys._getframe(1).f_lineno)
+    return getattr(obj, name)
+
+
+def _cv_setattr(value, obj, name):
+    # The value comes first because Python evaluates the right-hand side before the object on the left of the dot.
+    ACCESS.note_field(obj, name, "write", sys._getframe(1).f_lineno)
+    setattr(obj, name, value)
+
+
+def _cv_augattr(obj, name):
+    ACCESS.note_field(obj, name, "readwrite", sys._getframe(1).f_lineno)
 
 
 def _cv_iter(seq, index):
@@ -248,8 +287,38 @@ class AccessTransform(ast.NodeTransformer):
         call = ast.Call(func=ast.Name(id="_cv_get", ctx=ast.Load()), args=[node.value, node.slice], keywords=[])
         return ast.copy_location(call, node)
 
+    # obj.field: a read or a plain assignment is rewritten for any object expression (the value is passed first, so the
+    # order stays the original's); `+=` only for a plain `name.field`, because the note and the update would evaluate it twice. Names the compiler mangles (__x) and dunders are left alone: getattr would not mangle them.
+    @staticmethod
+    def _plain_attr(t):
+        return isinstance(t, ast.Attribute) and isinstance(t.value, ast.Name) and not t.attr.startswith("__")
+
+    def visit_Attribute(self, node):
+        self.generic_visit(node)
+        if not isinstance(node.ctx, ast.Load) or node.attr.startswith("__"):
+            return node
+        call = ast.Call(func=ast.Name(id="_cv_attr", ctx=ast.Load()), args=[node.value, ast.Constant(node.attr)], keywords=[])
+        return ast.copy_location(call, node)
+
+    # A pattern (`case a.b:`, `case Cls.Inner():`) may only hold a dotted name, never a call: leave its names alone.
+    def visit_MatchValue(self, node):
+        return node
+
+    def visit_MatchClass(self, node):
+        node.patterns = [self.visit(p) for p in node.patterns]
+        node.kwd_patterns = [self.visit(p) for p in node.kwd_patterns]
+        return node
+
+    def visit_MatchMapping(self, node):
+        node.patterns = [self.visit(p) for p in node.patterns]
+        return node
+
     def visit_Assign(self, node):
         self.generic_visit(node)
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Attribute) and not node.targets[0].attr.startswith("__"):
+            t = node.targets[0]
+            call = ast.Call(func=ast.Name(id="_cv_setattr", ctx=ast.Load()), args=[node.value, t.value, ast.Constant(t.attr)], keywords=[])
+            return ast.copy_location(ast.Expr(value=call), node)
         if len(node.targets) == 1:
             t = node.targets[0]
             if isinstance(t, ast.Subscript) and not isinstance(t.slice, ast.Slice):
@@ -260,6 +329,9 @@ class AccessTransform(ast.NodeTransformer):
     def visit_AugAssign(self, node):
         self.generic_visit(node)
         t = node.target
+        if self._plain_attr(t):
+            note = ast.Expr(value=ast.Call(func=ast.Name(id="_cv_augattr", ctx=ast.Load()), args=[t.value, ast.Constant(t.attr)], keywords=[]))
+            return [ast.copy_location(note, node), node]
         if isinstance(t, ast.Subscript) and not isinstance(t.slice, ast.Slice):
             note = ast.Expr(value=ast.Call(func=ast.Name(id="_cv_aug", ctx=ast.Load()), args=[t.value, t.slice], keywords=[]))
             return [ast.copy_location(note, node), node]
@@ -433,7 +505,8 @@ def run(root):
                 code = compile(instrument(tree), FILENAME, "exec")
                 sys.settrace(trace)
                 exec(code, {"__name__": "__main__", "_cv_get": _cv_get, "_cv_set": _cv_set,
-                            "_cv_aug": _cv_aug, "_cv_iter": _cv_iter, "_cv_enum": _cv_enum})
+                            "_cv_aug": _cv_aug, "_cv_iter": _cv_iter, "_cv_enum": _cv_enum,
+                            "_cv_attr": _cv_attr, "_cv_setattr": _cv_setattr, "_cv_augattr": _cv_augattr})
         except TraceLimit as hit:
             status = "trace_limit"
             limit_hit = {"kind": hit.which, "limit": hit.limit}
